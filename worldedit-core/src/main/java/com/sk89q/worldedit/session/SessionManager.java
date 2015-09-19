@@ -72,10 +72,24 @@ public class SessionManager {
      *
      * @param worldEdit a WorldEdit instance
      */
-    public SessionManager(WorldEdit worldEdit) {
+    private SessionManager(WorldEdit worldEdit) {
         checkNotNull(worldEdit);
         this.worldEdit = worldEdit;
-
+    }
+    
+     /**
+     * Create a new, initialized session manager.
+     *
+     * @param worldEdit a WorldEdit instance
+     * @return  a new, initialized session manager
+     */   
+    public static SessionManager makeInstance(WorldEdit worldEdit) {
+        SessionManager instance = new SessionManager(worldEdit);
+        instance.init();
+        return instance;
+    }
+    
+    private void init() {
         worldEdit.getEventBus().register(this);
         timer.schedule(new SessionTracker(), FLUSH_PERIOD, FLUSH_PERIOD);
     }

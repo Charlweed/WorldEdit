@@ -71,7 +71,9 @@ public final class CommandManager {
 
     private final WorldEdit worldEdit;
     private final PlatformManager platformManager;
-    private final Dispatcher dispatcher;
+    /*dispatcher can't be final, because we cannot safely 
+    initialise it  in the constructor.*/    
+    private Dispatcher dispatcher;
     private final DynamicStreamHandler dynamicHandler = new DynamicStreamHandler();
 
     /**
@@ -79,12 +81,26 @@ public final class CommandManager {
      *
      * @param worldEdit the WorldEdit instance
      */
-    CommandManager(final WorldEdit worldEdit, PlatformManager platformManager) {
+    private CommandManager(final WorldEdit worldEdit, PlatformManager platformManager) {
         checkNotNull(worldEdit);
         checkNotNull(platformManager);
         this.worldEdit = worldEdit;
         this.platformManager = platformManager;
+    }
+    /*package private access*/
+    static CommandManager makeInstance(final WorldEdit worldEdit, final PlatformManager platformManager){
+       CommandManager instance = new CommandManager(worldEdit, platformManager);
+       instance.init();
+       return instance;
+    }
+    /**
+     * Initialize this instance, and join event queues. We do this initialization
+     * here, instead of in the constructor, to insure that all instances are 
+     * fully initialized when they are added to the event queue. Always call this 
+     * immediately after construction!
+     */
 
+    private void init() {
         // Register this instance for command events
         worldEdit.getEventBus().register(this);
 
