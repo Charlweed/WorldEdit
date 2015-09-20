@@ -33,13 +33,13 @@ public class CommandSample00 {
 
     static {
         try {
-            commandMethod00 = CommandSample00.class.getMethod(COMMAND_NAME_00, (Class<?>) null);
+            commandMethod00 = CommandSample00.class.getMethod(COMMAND_NAME_00, (Class<?>[]) null);
         } catch (NoSuchMethodException ex) {
-            LOG.log(Level.SEVERE, null, ex);
-            fail("Refelection error obtaining commandMethod00 instance");
+            LOG.log(Level.SEVERE, ex.getMessage(), ex);
+            fail("Refelection error obtaining commandMethod00 instance");            
         } catch (SecurityException ex) {
-            LOG.log(Level.SEVERE, null, ex);
-            fail("Refelection error obtaining commandMethod00 instance");
+            LOG.log(Level.SEVERE, ex.getMessage(), ex);
+            fail("Refelection error obtaining commandMethod00 instance");            
         }
         COMMAND_METHODS = Arrays.asList(new Method[]{commandMethod00});
     }
