@@ -19,10 +19,14 @@
 
 package com.sk89q.worldedit.util.command.fluent;
 
+import com.sk89q.worldedit.WorldEdit;
+import com.sk89q.worldedit.extension.platform.PlatformManager;
 import com.sk89q.worldedit.util.command.CommandCallable;
 import com.sk89q.worldedit.util.command.Dispatcher;
 import com.sk89q.worldedit.util.command.SimpleDispatcher;
 import com.sk89q.worldedit.util.command.parametric.ParametricBuilder;
+import java.util.logging.Logger;
+import java.util.logging.Level;
 
 /**
  * A collection of commands.
@@ -32,7 +36,7 @@ public class DispatcherNode {
     private final CommandGraph graph;
     private final DispatcherNode parent;
     private final SimpleDispatcher dispatcher;
-    
+    private static final Logger LOGGER = Logger.getLogger(DispatcherNode.class.getCanonicalName());    
     /**
      * Create a new instance.
      * 
@@ -88,6 +92,28 @@ public class DispatcherNode {
         return this;
     }
     
+      /**
+     * Calls RegisterMethods on every Class that contains Commands, in  the jars,
+     * in WorldEdit's data directory. This allows for easy deployment of Java
+     * based commands without rebuilding and reinstalling WorldEdit.
+     * Delegates to {@linkLocalRegistrar.registerJaredCommands(platformManager, this, worldEdit)}
+     * Any java.lang.Exception (but not all Throwables) thrown by the registration
+     * process is caught here, so that WorldEdit is not vulnerable.
+     * @param worldEdit the WorldEdit instance
+     * @param platformManager The PlatformManager for this instance. May not 
+     *  be null, but if uninitialized, workingDirectory is set to "./"
+     * @return this DispatcherNode
+     * @see ParametricBuilder#registerMethodsAsCommands(com.sk89q.worldedit.util.command.Dispatcher, Object)
+     */
+    public DispatcherNode registerJars(WorldEdit worldEdit, PlatformManager platformManager) {
+        try {
+            LocalRegistrar.registerJaredCommands(platformManager, this, worldEdit);
+
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+        return this;
+    }  
     /**
      * Create a new command that will contain sub-commands.
      * 

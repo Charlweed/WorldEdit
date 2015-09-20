@@ -120,6 +120,7 @@ public final class CommandManager {
         dispatcher = new CommandGraph()
                 .builder(builder)
                     .commands()
+                        .registerJars(worldEdit,platformManager)
                         .registerMethods(new BiomeCommands(worldEdit))
                         .registerMethods(new ChunkCommands(worldEdit))
                         .registerMethods(new ClipboardCommands(worldEdit))
