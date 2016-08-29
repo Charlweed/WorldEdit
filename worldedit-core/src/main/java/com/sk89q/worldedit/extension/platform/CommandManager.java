@@ -29,17 +29,20 @@ import com.sk89q.worldedit.LocalConfiguration;
 import com.sk89q.worldedit.LocalSession;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.command.*;
+import com.sk89q.worldedit.command.argument.ReplaceParser;
+import com.sk89q.worldedit.command.argument.TreeGeneratorParser;
+import com.sk89q.worldedit.command.composition.*;
 import com.sk89q.worldedit.event.platform.CommandEvent;
 import com.sk89q.worldedit.event.platform.CommandSuggestionEvent;
-import com.sk89q.worldedit.internal.command.ActorAuthorizer;
-import com.sk89q.worldedit.internal.command.CommandLoggingHandler;
-import com.sk89q.worldedit.internal.command.UserCommandCompleter;
-import com.sk89q.worldedit.internal.command.WorldEditBinding;
-import com.sk89q.worldedit.internal.command.WorldEditExceptionConverter;
+import com.sk89q.worldedit.function.factory.Deform;
+import com.sk89q.worldedit.function.factory.Deform.Mode;
+import com.sk89q.worldedit.internal.command.*;
 import com.sk89q.worldedit.session.request.Request;
 import com.sk89q.worldedit.util.command.Dispatcher;
 import com.sk89q.worldedit.util.command.InvalidUsageException;
+import com.sk89q.worldedit.util.command.composition.ProvidedValue;
 import com.sk89q.worldedit.util.command.fluent.CommandGraph;
+import com.sk89q.worldedit.util.command.parametric.ExceptionConverter;
 import com.sk89q.worldedit.util.command.parametric.LegacyCommandsHandler;
 import com.sk89q.worldedit.util.command.parametric.ParametricBuilder;
 import com.sk89q.worldedit.util.eventbus.Subscribe;
@@ -56,6 +59,7 @@ import java.util.logging.Logger;
 import java.util.regex.Pattern;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.sk89q.worldedit.util.command.composition.LegacyCommandAdapter.adapt;
 
 /**
  * Handles the registration and invocation of commands.
@@ -67,7 +71,7 @@ public final class CommandManager {
     public static final Pattern COMMAND_CLEAN_PATTERN = Pattern.compile("^[/]+");
     private static final Logger log = Logger.getLogger(CommandManager.class.getCanonicalName());
     private static final Logger commandLog = Logger.getLogger(CommandManager.class.getCanonicalName() + ".CommandLog");
-    private static final java.util.regex.Pattern numberFormatExceptionPattern = java.util.regex.Pattern.compile("^For input string: \"(.*)\"$");
+    private static final Pattern numberFormatExceptionPattern = Pattern.compile("^For input string: \"(.*)\"$");
 
     private final WorldEdit worldEdit;
     private final PlatformManager platformManager;
@@ -75,6 +79,7 @@ public final class CommandManager {
     initialise it  in the constructor.*/    
     private Dispatcher dispatcher;
     private final DynamicStreamHandler dynamicHandler = new DynamicStreamHandler();
+    private ExceptionConverter exceptionConverter;
 
     /**
      * Create a new instance.
@@ -99,7 +104,6 @@ public final class CommandManager {
      * fully initialized when they are added to the event queue. Always call this 
      * immediately after construction!
      */
-
     private void init() {
         // Register this instance for command events
         worldEdit.getEventBus().register(this);
@@ -113,7 +117,6 @@ public final class CommandManager {
         builder.setAuthorizer(new ActorAuthorizer());
         builder.setDefaultCompleter(new UserCommandCompleter(platformManager));
         builder.addBinding(new WorldEditBinding(worldEdit));
-        builder.addExceptionConverter(new WorldEditExceptionConverter(worldEdit));
         builder.addInvokeListener(new LegacyCommandsHandler());
         builder.addInvokeListener(new CommandLoggingHandler(worldEdit, commandLog));
 
@@ -135,6 +138,7 @@ public final class CommandManager {
                         .registerMethods(new ToolUtilCommands(worldEdit))
                         .registerMethods(new ToolCommands(worldEdit))
                         .registerMethods(new UtilityCommands(worldEdit))
+                        .register(adapt(new SelectionCommand(new ApplyCommand(new ReplaceParser(), "Set all blocks within selection"), "worldedit.region.set")), "/set")
                         .group("worldedit", "we")
                             .describeAs("WorldEdit commands")
                             .registerMethods(new WorldEditCommands(worldEdit))
@@ -150,7 +154,14 @@ public final class CommandManager {
                         .group("brush", "br")
                             .describeAs("Brushing commands")
                             .registerMethods(new BrushCommands(worldEdit))
-                            .parent()
+                            .register(adapt(new ShapedBrushCommand(new DeformCommand(), "worldedit.brush.deform")), "deform")
+                            .register(adapt(new ShapedBrushCommand(new ApplyCommand(new ReplaceParser(), "Set all blocks within region"), "worldedit.brush.set")), "set")
+                            .register(adapt(new ShapedBrushCommand(new PaintCommand(), "worldedit.brush.paint")), "paint")
+                            .register(adapt(new ShapedBrushCommand(new ApplyCommand(), "worldedit.brush.apply")), "apply")
+                            .register(adapt(new ShapedBrushCommand(new PaintCommand(new TreeGeneratorParser("treeType")), "worldedit.brush.forest")), "forest")
+                            .register(adapt(new ShapedBrushCommand(ProvidedValue.create(new Deform("y-=1", Mode.RAW_COORD), "Raise one block"), "worldedit.brush.raise")), "raise")
+                            .register(adapt(new ShapedBrushCommand(ProvidedValue.create(new Deform("y+=1", Mode.RAW_COORD), "Lower one block"), "worldedit.brush.lower")), "lower")
+                        .parent()
                         .group("superpickaxe", "pickaxe", "sp")
                             .describeAs("Super-pickaxe commands")
                             .registerMethods(new SuperPickaxeCommands(worldEdit))
@@ -161,6 +172,11 @@ public final class CommandManager {
                             .parent()
                         .graph()
                 .getDispatcher();
+        this.exceptionConverter = new WorldEditExceptionConverter(worldEdit);           
+    }
+
+    public ExceptionConverter getExceptionConverter() {
+        return exceptionConverter;
     }
 
     void register(Platform platform) {
@@ -235,11 +251,28 @@ public final class CommandManager {
 
         CommandLocals locals = new CommandLocals();
         locals.put(Actor.class, actor);
+        locals.put("arguments", event.getArguments());
 
         long start = System.currentTimeMillis();
 
         try {
-            dispatcher.call(Joiner.on(" ").join(split), locals, new String[0]);
+            // This is a bit of a hack, since the call method can only throw CommandExceptions
+            // everything needs to be wrapped at least once. Which means to handle all WorldEdit
+            // exceptions without writing a hook into every dispatcher, we need to unwrap these
+            // exceptions and rethrow their converted form, if their is one.
+            try {
+                dispatcher.call(Joiner.on(" ").join(split), locals, new String[0]);
+            } catch (Throwable t) {
+                // Use the exception converter to convert the exception if any of its causes
+                // can be converted, otherwise throw the original exception
+                Throwable next = t;
+                do {
+                    exceptionConverter.convert(next);
+                    next = next.getCause();
+                } while (next != null);
+
+                throw t;
+            }
         } catch (CommandPermissionsException e) {
             actor.printError("You are not permitted to do that. Are you in the right mode?");
         } catch (InvalidUsageException e) {
@@ -299,6 +332,7 @@ public final class CommandManager {
         try {
             CommandLocals locals = new CommandLocals();
             locals.put(Actor.class, event.getActor());
+            locals.put("arguments", event.getArguments());
             event.setSuggestions(dispatcher.getSuggestions(event.getArguments(), locals));
         } catch (CommandException e) {
             event.getActor().printError(e.getMessage());

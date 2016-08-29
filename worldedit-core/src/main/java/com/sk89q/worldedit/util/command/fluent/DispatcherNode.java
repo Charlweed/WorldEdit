@@ -71,8 +71,9 @@ public class DispatcherNode {
      * @param callable the executor
      * @param alias the list of aliases, where the first alias is the primary one
      */
-    public void register(CommandCallable callable, String... alias) {
+    public DispatcherNode register(CommandCallable callable, String... alias) {
         dispatcher.registerCommand(callable, alias);
+        return this;
     }
 
     /**

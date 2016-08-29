@@ -20,13 +20,14 @@
 package com.sk89q.worldedit.forge;
 
 import com.sk89q.worldedit.Vector;
+
+import java.lang.reflect.Constructor;
+import javax.annotation.Nullable;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.nbt.NBTTagInt;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
-
-import javax.annotation.Nullable;
-import java.lang.reflect.Constructor;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -81,7 +82,7 @@ final class TileEntityUtils {
             tileEntity.readFromNBT(tag);
         }
 
-        world.setTileEntity(position.getBlockX(), position.getBlockY(), position.getBlockZ(), tileEntity);
+        world.setTileEntity(new BlockPos(position.getBlockX(), position.getBlockY(), position.getBlockZ()), tileEntity);
     }
 
     /**
@@ -95,9 +96,9 @@ final class TileEntityUtils {
     static void setTileEntity(World world, Vector position, @Nullable NBTTagCompound tag) {
         if (tag != null) {
             updateForSet(tag, position);
-            TileEntity tileEntity = TileEntity.createAndLoadEntity(tag);
+            TileEntity tileEntity = TileEntity.create(tag);
             if (tileEntity != null) {
-                world.setTileEntity(position.getBlockX(), position.getBlockY(), position.getBlockZ(), tileEntity);
+                world.setTileEntity(new BlockPos(position.getBlockX(), position.getBlockY(), position.getBlockZ()), tileEntity);
             }
         }
     }
@@ -138,6 +139,5 @@ final class TileEntityUtils {
 
         return genericTE;
     }
-
 
 }

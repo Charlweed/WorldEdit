@@ -27,7 +27,6 @@ import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.WorldVector;
 import com.sk89q.worldedit.internal.LocalWorldAdapter;
 import com.sk89q.worldedit.world.World;
-import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
 import org.bukkit.event.Event.Result;
 import org.bukkit.event.EventHandler;
@@ -37,6 +36,7 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerGameModeChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.inventory.EquipmentSlot;
 
 /**
  * Handles all events thrown in relation to a Player
@@ -44,7 +44,6 @@ import org.bukkit.event.player.PlayerInteractEvent;
 public class WorldEditListener implements Listener {
 
     private WorldEditPlugin plugin;
-    private boolean ignoreLeftClickAir = false;
 
     /**
      * Called when a player plays an animation, such as an arm swing
@@ -116,6 +115,15 @@ public class WorldEditListener implements Listener {
             return;
         }
 
+        try {
+            if (event.getHand() == EquipmentSlot.OFF_HAND) {
+                return; // TODO api needs to be able to get either hand depending on event
+                // for now just ignore all off hand interacts
+            }
+        } catch (NoSuchMethodError ignored) {
+        } catch (NoSuchFieldError ignored) {
+        }
+
         final LocalPlayer player = plugin.wrapPlayer(event.getPlayer());
         final World world = player.getWorld();
         final WorldEdit we = plugin.getWorldEdit();
@@ -133,22 +141,7 @@ public class WorldEditListener implements Listener {
                 event.setCancelled(true);
             }
 
-            if (!ignoreLeftClickAir) {
-                final int taskId = Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, new Runnable() {
-                    @Override
-                    public void run() {
-                        ignoreLeftClickAir = false;
-                    }
-                }, 2);
-
-                if (taskId != -1) {
-                    ignoreLeftClickAir = true;
-                }
-            }
         } else if (action == Action.LEFT_CLICK_AIR) {
-            if (ignoreLeftClickAir) {
-                return;
-            }
 
             if (we.handleArmSwing(player)) {
                 event.setCancelled(true);

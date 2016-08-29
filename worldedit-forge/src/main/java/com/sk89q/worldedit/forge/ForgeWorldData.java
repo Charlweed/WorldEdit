@@ -30,12 +30,6 @@ class ForgeWorldData extends LegacyWorldData {
     private static final ForgeWorldData INSTANCE = new ForgeWorldData();
     private final BiomeRegistry biomeRegistry = new ForgeBiomeRegistry();
 
-    /**
-     * Create a new instance.
-     */
-    ForgeWorldData() {
-    }
-
     @Override
     public BiomeRegistry getBiomeRegistry() {
         return biomeRegistry;

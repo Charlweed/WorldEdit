@@ -20,13 +20,15 @@
 package com.sk89q.worldedit.forge;
 
 import com.sk89q.worldedit.util.command.CommandMapping;
-import net.minecraft.command.CommandBase;
-import net.minecraft.command.ICommand;
-import net.minecraft.command.ICommandSender;
 
-import javax.annotation.Nullable;
 import java.util.Arrays;
 import java.util.List;
+import javax.annotation.Nullable;
+import net.minecraft.command.CommandBase;
+import net.minecraft.command.CommandException;
+import net.minecraft.command.ICommand;
+import net.minecraft.command.ICommandSender;
+import net.minecraft.server.MinecraftServer;
 
 public class CommandWrapper extends CommandBase {
     private CommandMapping command;
@@ -46,7 +48,8 @@ public class CommandWrapper extends CommandBase {
     }
 
     @Override
-    public void processCommand(ICommandSender var1, String[] var2) {}
+    public void execute(MinecraftServer server, ICommandSender sender, String[] args) throws CommandException {
+    }
 
     @Override
     public String getCommandUsage(ICommandSender icommandsender) {
@@ -59,13 +62,12 @@ public class CommandWrapper extends CommandBase {
     }
 
     @Override
-    public boolean canCommandSenderUseCommand(ICommandSender sender) {
+    public boolean checkPermission(MinecraftServer server, ICommandSender sender) {
         return true;
     }
 
     @Override
-    public int compareTo(@Nullable
-    Object o) {
+    public int compareTo(@Nullable ICommand o) {
         if (o == null) {
             return 0;
         } else if (o instanceof ICommand) {

@@ -395,6 +395,10 @@ public class UtilityCommands {
         // there might be a better way to do this but my brain is fried right now
         if (args.argsLength() > 0) { // user inputted radius, override the default
             radius = args.getInteger(0);
+            if (radius < -1) {
+                actor.printError("Use -1 to remove all mobs in loaded chunks");
+                return;
+            }
             if (config.butcherMaxRadius != -1) { // clamp if there is a max
                 if (radius == -1) {
                     radius = config.butcherMaxRadius;
@@ -510,6 +514,7 @@ public class UtilityCommands {
         usage = "<expression>",
         desc = "Evaluate a mathematical expression"
     )
+    @CommandPermissions("worldedit.calc")
     public void calc(Actor actor, @Text String input) throws CommandException {
         try {
             Expression expression = Expression.compile(input);
@@ -658,7 +663,7 @@ public class UtilityCommands {
                         builder.append(" ");
                     }
                     builder.append(mapping.getPrimaryAlias());
-                    box.appendCommand(builder.toString(), mapping.getDescription().getShortDescription());
+                    box.appendCommand(builder.toString(), mapping.getDescription().getDescription());
                 }
             }
 

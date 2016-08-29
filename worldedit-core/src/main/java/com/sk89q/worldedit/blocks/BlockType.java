@@ -23,6 +23,7 @@ import com.sk89q.util.StringUtil;
 import com.sk89q.worldedit.PlayerDirection;
 
 import javax.annotation.Nullable;
+
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -235,7 +236,28 @@ public enum BlockType {
     BIRCH_DOOR(BlockID.BIRCH_DOOR, "Birch Door", "birchdoor"),
     JUNGLE_DOOR(BlockID.JUNGLE_DOOR, "Jungle Door", "jungledoor"),
     ACACIA_DOOR(BlockID.ACACIA_DOOR, "Acacia Door", "acaciadoor"),
-    DARK_OAK_DOOR(BlockID.DARK_OAK_DOOR, "Dark Oak Door", "darkoakdoor");
+    DARK_OAK_DOOR(BlockID.DARK_OAK_DOOR, "Dark Oak Door", "darkoakdoor"),
+    END_ROD(BlockID.END_ROD, "End Rod", "endrod", "endtorch"),
+    CHORUS_PLANT(BlockID.CHORUS_PLANT, "Chorus Plant", "chorusplant", "chorusstem"),
+    CHORUS_FLOWER(BlockID.CHORUS_FLOWER, "Chorus Flower", "chorusflower"),
+    PURPUR_BLOCK(BlockID.PURPUR_BLOCK, "Purpur Block", "purpurblock", "blockpurpur"),
+    PURPUR_PILLAR(BlockID.PURPUR_PILLAR, "Purpur Pillar", "purpurpillar"),
+    PURPUR_STAIRS(BlockID.PURPUR_STAIRS, "Purpur Stairs", "purpurstairs"),
+    PURPUR_DOUBLE_SLAB(BlockID.PURPUR_DOUBLE_SLAB, "Purpur Double Slab", "purpurdoubleslab", "doubleslabpurpur", "doublepurpurslab"),
+    PURPUR_SLAB(BlockID.PURPUR_SLAB, "Purpur Slab", "purpurslab", "slabpurpur"),
+    END_BRICKS(BlockID.END_BRICKS, "End Bricks", "endbricks"),
+    BEETROOTS(BlockID.BEETROOTS, "Beetroots", "beetroots", "beetroot_plant"),
+    GRASS_PATH(BlockID.GRASS_PATH, "Grass Path", "grasspath", "dirtpath"),
+    END_GATEWAY(BlockID.END_GATEWAY, "End Gateway", "endgateway"),
+    REPEATING_COMMAND_BLOCK(BlockID.REPEATING_COMMAND_BLOCK, "Repeating Command Block", "repeatingcommandblock", "commandblockrepeating"),
+    CHAIN_COMMAND_BLOCK(BlockID.CHAIN_COMMAND_BLOCK, "Chain Command Block", "chaincommandblock", "commandblockchain"),
+    FROSTED_ICE(BlockID.FROSTED_ICE, "Frosted Ice", "frostedice", "frostwalkerice"),
+    MAGMA_BLOCK(BlockID.MAGMA_BLOCK, "Magma Block", "magmablock", "magma"),
+    NETHER_WART_BLOCK(BlockID.NETHER_WART_BLOCK, "Nether Wart Block", "netherwartblock"),
+    RED_NETHER_BRICK(BlockID.RED_NETHER_BRICK, "Red Nether Brick", "rednetherbrick", "netherbrickred"),
+    BONE_BLOCK(BlockID.BONE_BLOCK, "Bone Block", "boneblock", "blockbone", "fossil", "fossilblock", "blockfossil"),
+    STRUCTURE_VOID(BlockID.STRUCTURE_VOID, "Structure Void", "structurevoid", "structureair"),
+    STRUCTURE_BLOCK(BlockID.STRUCTURE_BLOCK, "Structure Block", "structureblock");
 
     /**
      * Stores a map of the IDs for fast access.
@@ -497,6 +519,11 @@ public enum BlockType {
     static {
         shouldPlaceFinal.add(BlockID.SIGN_POST);
         shouldPlaceFinal.add(BlockID.WOODEN_DOOR);
+        shouldPlaceFinal.add(BlockID.ACACIA_DOOR);
+        shouldPlaceFinal.add(BlockID.BIRCH_DOOR);
+        shouldPlaceFinal.add(BlockID.JUNGLE_DOOR);
+        shouldPlaceFinal.add(BlockID.DARK_OAK_DOOR);
+        shouldPlaceFinal.add(BlockID.SPRUCE_DOOR);
         shouldPlaceFinal.add(BlockID.WALL_SIGN);
         shouldPlaceFinal.add(BlockID.IRON_DOOR);
         shouldPlaceFinal.add(BlockID.CACTUS);
@@ -920,6 +947,11 @@ public enum BlockType {
         isRedstoneBlock.add(BlockID.STONE_BUTTON);
         isRedstoneBlock.add(BlockID.REDSTONE_WIRE);
         isRedstoneBlock.add(BlockID.WOODEN_DOOR);
+        isRedstoneBlock.add(BlockID.ACACIA_DOOR);
+        isRedstoneBlock.add(BlockID.BIRCH_DOOR);
+        isRedstoneBlock.add(BlockID.JUNGLE_DOOR);
+        isRedstoneBlock.add(BlockID.DARK_OAK_DOOR);
+        isRedstoneBlock.add(BlockID.SPRUCE_DOOR);
         isRedstoneBlock.add(BlockID.IRON_DOOR);
         isRedstoneBlock.add(BlockID.TNT);
         isRedstoneBlock.add(BlockID.DISPENSER);
@@ -1510,6 +1542,12 @@ public enum BlockType {
         addIdentity(BlockID.PACKED_ICE);
         addIdentities(BlockID.STAINED_GLASS_PANE, 16);
         addIdentities(BlockID.DOUBLE_PLANT, 6);
+
+        addIdentities(BlockID.ACACIA_DOOR, 8); // rule 2
+        addIdentities(BlockID.BIRCH_DOOR, 8); // rule 2
+        addIdentities(BlockID.JUNGLE_DOOR, 8); // rule 2
+        addIdentities(BlockID.DARK_OAK_DOOR, 8); // rule 2
+        addIdentities(BlockID.SPRUCE_DOOR, 8); // rule 2
     }
 
     /**
