@@ -30,7 +30,6 @@ import com.sk89q.worldedit.blocks.BaseItemStack;
 import com.sk89q.worldedit.entity.BaseEntity;
 import com.sk89q.worldedit.entity.Entity;
 import com.sk89q.worldedit.regions.Region;
-import com.sk89q.worldedit.sponge.nms.IDHelper;
 import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.world.AbstractWorld;
 import com.sk89q.worldedit.world.biome.BaseBiome;
@@ -48,6 +47,7 @@ import org.spongepowered.api.event.cause.Cause;
 import org.spongepowered.api.event.cause.NamedCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnCause;
 import org.spongepowered.api.event.cause.entity.spawn.SpawnTypes;
+import org.spongepowered.api.world.BlockChangeFlag;
 import org.spongepowered.api.world.World;
 
 import javax.annotation.Nullable;
@@ -55,7 +55,6 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Random;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
@@ -63,8 +62,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
  * An adapter to Minecraft worlds for WorldEdit.
  */
 public abstract class SpongeWorld extends AbstractWorld {
-
-    protected static final Random random = new Random();
 
     private final WeakReference<World> worldRef;
 
@@ -136,15 +133,12 @@ public abstract class SpongeWorld extends AbstractWorld {
                 .world(world.getProperties())
                 .build();
 
-        snapshot.restore(true, notifyAndLight);
+        snapshot.restore(true, notifyAndLight ? BlockChangeFlag.ALL : BlockChangeFlag.NONE);
 
         // Create the TileEntity
         if (block.hasNbtData()) {
             // Kill the old TileEntity
-            Optional<TileEntity> optTile = world.getTileEntity(pos);
-            if (optTile.isPresent()) {
-                applyTileEntityData(optTile.get(), block);
-            }
+            world.getTileEntity(pos).ifPresent(tileEntity -> applyTileEntityData(tileEntity, block));
         }
 
         return true;
@@ -176,7 +170,7 @@ public abstract class SpongeWorld extends AbstractWorld {
     @Override
     public BaseBiome getBiome(Vector2D position) {
         checkNotNull(position);
-        return new BaseBiome(IDHelper.resolve(getWorld().getBiome(position.getBlockX(), position.getBlockZ())));
+        return new BaseBiome(SpongeWorldEdit.inst().getAdapter().resolve(getWorld().getBiome(position.getBlockX(), 0, position.getBlockZ())));
     }
 
     @Override
@@ -184,7 +178,7 @@ public abstract class SpongeWorld extends AbstractWorld {
         checkNotNull(position);
         checkNotNull(biome);
 
-        getWorld().setBiome(position.getBlockX(), position.getBlockZ(), IDHelper.resolveBiome(biome.getId()));
+        getWorld().setBiome(position.getBlockX(), 0, position.getBlockZ(), SpongeWorldEdit.inst().getAdapter().resolveBiome(biome.getId()));
         return true;
     }
 
@@ -197,16 +191,13 @@ public abstract class SpongeWorld extends AbstractWorld {
             return;
         }
 
-        Optional<org.spongepowered.api.entity.Entity> optItem = getWorld().createEntity(
+        org.spongepowered.api.entity.Entity entity = getWorld().createEntity(
                 EntityTypes.ITEM,
                 new Vector3d(position.getX(), position.getY(), position.getZ())
         );
 
-        if (optItem.isPresent()) {
-            org.spongepowered.api.entity.Entity entity = optItem.get();
-            entity.offer(Keys.REPRESENTED_ITEM, SpongeWorldEdit.toSpongeItemStack(item).createSnapshot());
-            getWorld().spawnEntity(entity, ENTITY_SPAWN_CAUSE);
-        }
+        entity.offer(Keys.REPRESENTED_ITEM, SpongeWorldEdit.toSpongeItemStack(item).createSnapshot());
+        getWorld().spawnEntity(entity, ENTITY_SPAWN_CAUSE);
     }
 
     @Override
@@ -216,7 +207,7 @@ public abstract class SpongeWorld extends AbstractWorld {
 
     @Override
     public boolean isValidBlockType(int id) {
-        return (id == 0) || (IDHelper.resolveBlock(id) != null);
+        return id == 0 || SpongeWorldEdit.inst().getAdapter().resolveBlock(id) != null;
     }
 
     @Override
@@ -233,10 +224,9 @@ public abstract class SpongeWorld extends AbstractWorld {
             World otherWorld = other.worldRef.get();
             World thisWorld = worldRef.get();
             return otherWorld != null && thisWorld != null && otherWorld.equals(thisWorld);
-        } else if (o instanceof com.sk89q.worldedit.world.World) {
-            return ((com.sk89q.worldedit.world.World) o).getName().equals(getName());
         } else {
-            return false;
+            return o instanceof com.sk89q.worldedit.world.World
+                    && ((com.sk89q.worldedit.world.World) o).getName().equals(getName());
         }
     }
 
@@ -276,24 +266,21 @@ public abstract class SpongeWorld extends AbstractWorld {
         EntityType entityType = Sponge.getRegistry().getType(EntityType.class, entity.getTypeId()).get();
         Vector3d pos = new Vector3d(location.getX(), location.getY(), location.getZ());
 
-        Optional<org.spongepowered.api.entity.Entity> optNewEnt = world.createEntity(entityType, pos);
-        if (optNewEnt.isPresent()) {
-            org.spongepowered.api.entity.Entity newEnt = optNewEnt.get();
-            if (entity.hasNbtData()) {
-                applyEntityData(newEnt, entity);
-            }
+        org.spongepowered.api.entity.Entity newEnt = world.createEntity(entityType, pos);
+        if (entity.hasNbtData()) {
+            applyEntityData(newEnt, entity);
+        }
 
-            // Overwrite any data set by the NBT application
-            Vector dir = location.getDirection();
+        // Overwrite any data set by the NBT application
+        Vector dir = location.getDirection();
 
-            newEnt.setLocationAndRotation(
-                    new org.spongepowered.api.world.Location<>(getWorld(), pos),
-                    new Vector3d(dir.getX(), dir.getY(), dir.getZ())
-            );
+        newEnt.setLocationAndRotation(
+                new org.spongepowered.api.world.Location<>(getWorld(), pos),
+                new Vector3d(dir.getX(), dir.getY(), dir.getZ())
+        );
 
-            if (world.spawnEntity(newEnt, ENTITY_SPAWN_CAUSE)) {
-                return new SpongeEntity(newEnt);
-            }
+        if (world.spawnEntity(newEnt, ENTITY_SPAWN_CAUSE)) {
+            return new SpongeEntity(newEnt);
         }
 
         return null;

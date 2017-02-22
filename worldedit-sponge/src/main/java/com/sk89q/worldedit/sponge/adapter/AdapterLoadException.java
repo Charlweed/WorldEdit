@@ -17,26 +17,25 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sk89q.worldedit.sponge;
+package com.sk89q.worldedit.sponge.adapter;
 
-import com.flowpowered.math.vector.Vector3d;
-import com.sk89q.worldedit.Vector;
-import com.sk89q.worldedit.sponge.nms.SpongeNMSWorld;
-import com.sk89q.worldedit.util.Location;
-import com.sk89q.worldedit.world.World;
+/**
+ * Thrown when no adapter can be found.
+ */
+public class AdapterLoadException extends Exception {
 
-final class SpongeAdapter {
-
-    private SpongeAdapter() {
+    public AdapterLoadException() {
     }
 
-    public static World adapt(org.spongepowered.api.world.World world) {
-        return new SpongeNMSWorld(world);
+    public AdapterLoadException(String message) {
+        super(message);
     }
 
-    public static Location adapt(org.spongepowered.api.world.Location<org.spongepowered.api.world.World> loc, Vector3d rot) {
-        Vector position = new Vector(loc.getX(), loc.getY(), loc.getZ());
+    public AdapterLoadException(String message, Throwable cause) {
+        super(message, cause);
+    }
 
-        return new Location(SpongeAdapter.adapt(loc.getExtent()), position, (float) rot.getY(), (float) rot.getX());
+    public AdapterLoadException(Throwable cause) {
+        super(cause);
     }
 }
