@@ -26,24 +26,24 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.sk89q.minecraft.util.commands.Command;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.extension.platform.PlatformManager;
+import java.io.File;
+import java.io.IOException;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
+import static java.util.Collections.EMPTY_LIST;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.zip.ZipException;
-import java.io.File;
-import java.io.IOException;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Method;
-import java.net.URL;
-import java.net.URLClassLoader;
-import java.util.ArrayList;
-import java.util.Arrays;
-import static java.util.Collections.EMPTY_LIST;
-import java.util.List;
 
 /**
  * Registers Local Commands by registering all of the commands, in all of the
@@ -110,7 +110,8 @@ public class LocalRegistrar {
                 method.setAccessible(true);
                 method.invoke(CLASS_LOADER, new Object[]{u});
                 LOGGER.log(Level.FINE, "Successfully added {0} to classpath", u.toString());
-            } /**
+            }
+            /**
              * May have different handling of these exceptions someday**
              */
             catch (IllegalAccessException ex) {

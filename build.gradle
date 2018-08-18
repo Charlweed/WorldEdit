@@ -27,7 +27,7 @@ buildscript {
     }
 
     dependencies {
-        classpath 'com.github.jengelman.gradle.plugins:shadow:1.2.3'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.4'
         classpath 'org.jfrog.buildinfo:build-info-extractor-gradle:4.3.0'
         classpath 'org.ajoberstar:gradle-git:1.5.1'
     }
@@ -35,7 +35,7 @@ buildscript {
 
 allprojects {
     group = 'com.sk89q.worldedit'
-    version = '6.1.9-SNAPSHOT'
+    version = '7.0.0-SNAPSHOT'
 }
 
 if (!project.hasProperty("artifactory_contextUrl")) ext.artifactory_contextUrl = "http://localhost"
@@ -87,11 +87,11 @@ subprojects {
 
     ext.internalVersion = version + ";" + gitCommitHash
 
-    sourceCompatibility = 1.7
-    targetCompatibility = 1.7
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 
     checkstyle.configFile = new File(rootProject.projectDir, "config/checkstyle/checkstyle.xml")
-    checkstyle.toolVersion = '7.6.1'
+    checkstyle.toolVersion = "7.6.1"
 
     repositories {
         mavenCentral()

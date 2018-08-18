@@ -16,15 +16,13 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-
 package com.sk89q.worldedit.extension.platform;
 
+import static com.google.common.base.Preconditions.checkNotNull;
 import com.sk89q.worldedit.LocalConfiguration;
 import com.sk89q.worldedit.LocalSession;
-import com.sk89q.worldedit.ServerInterface;
 import com.sk89q.worldedit.Vector;
 import com.sk89q.worldedit.WorldEdit;
-import com.sk89q.worldedit.WorldVector;
 import com.sk89q.worldedit.command.tool.BlockTool;
 import com.sk89q.worldedit.command.tool.DoubleActionBlockTool;
 import com.sk89q.worldedit.command.tool.DoubleActionTraceTool;
@@ -38,13 +36,11 @@ import com.sk89q.worldedit.event.platform.PlatformInitializeEvent;
 import com.sk89q.worldedit.event.platform.PlatformReadyEvent;
 import com.sk89q.worldedit.event.platform.PlayerInputEvent;
 import com.sk89q.worldedit.extension.platform.permission.ActorSelectorLimits;
-import com.sk89q.worldedit.internal.ServerInterfaceAdapter;
 import com.sk89q.worldedit.regions.RegionSelector;
+import com.sk89q.worldedit.util.HandSide;
 import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.util.eventbus.Subscribe;
 import com.sk89q.worldedit.world.World;
-
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.Iterator;
@@ -54,27 +50,30 @@ import java.util.Map.Entry;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import static com.google.common.base.Preconditions.checkNotNull;
+import javax.annotation.Nullable;
 
 /**
  * Manages registered {@link Platform}s for WorldEdit. Platforms are
  * implementations of WorldEdit.
  *
- * <p>This class is thread-safe.</p>
+ * <p>
+ * This class is thread-safe.</p>
  */
 public class PlatformManager {
 
     private static final Logger logger = Logger.getLogger(PlatformManager.class.getCanonicalName());
 
     private final WorldEdit worldEdit;
-    /**This is tricky. We would prefer CommandManager to be
-     * final, but it is constructed with 'this', and then puts itself on
-     * an event queue. Leaking the uninitialized 'this' creates other problems.**/    
+    /**
+     * This is tricky. We would prefer CommandManager to be final, but it is
+     * constructed with 'this', and then puts itself on an event queue. Leaking
+     * the uninitialized 'this' creates other problems.*
+     */
     private CommandManager commandManager;
-    private final List<Platform> platforms = new ArrayList<Platform>();
-    private final Map<Capability, Platform> preferences = new EnumMap<Capability, Platform>(Capability.class);
-    private @Nullable String firstSeenVersion;
+    private final List<Platform> platforms = new ArrayList<>();
+    private final Map<Capability, Platform> preferences = new EnumMap<>(Capability.class);
+    private @Nullable
+    String firstSeenVersion;
     private final AtomicBoolean initialized = new AtomicBoolean();
     private final AtomicBoolean configured = new AtomicBoolean();
 
@@ -83,17 +82,17 @@ public class PlatformManager {
      *
      * @param worldEdit the WorldEdit instance
      */
-    private PlatformManager(WorldEdit worldEdit) {
+    public PlatformManager(WorldEdit worldEdit) {
         checkNotNull(worldEdit);
         this.worldEdit = worldEdit;
     }
-    
+
     /**
      * Constructs a CommandManager if it does not exist, and adds it to the
      * worldEdit event bus. We do this initialization here, instead of in the
-     * constructor, to insure that all instances are fully initialized when 
-     * they are added to that event queue. Always call this 
-     * immediately after construction!
+     * constructor, to insure that all instances are fully initialized when they
+     * are added to that event queue. Always call this immediately after
+     * construction!
      */
     private void init() {
         if (commandManager == null) {
@@ -102,17 +101,19 @@ public class PlatformManager {
             worldEdit.getEventBus().register(this);
         }
     }
+
     /**
      * Create a new, initialized platform manager.
      *
      * @param worldEdit the WorldEdit instance
      * @return a new, initialized instance of PlatformManager.
-     */    
+     */
     public static PlatformManager makeInstance(WorldEdit worldEdit) {
         PlatformManager instance = new PlatformManager(worldEdit);
         instance.init();
         return instance;
     }
+
     /**
      * Register a platform with WorldEdit.
      *
@@ -130,9 +131,9 @@ public class PlatformManager {
         // Make sure that versions are in sync
         if (firstSeenVersion != null) {
             if (!firstSeenVersion.equals(platform.getVersion())) {
-                logger.log(Level.WARNING, "Multiple ports of WorldEdit are installed but they report different versions ({0} and {1}). " +
-                                "If these two versions are truly different, then you may run into unexpected crashes and errors.",
-                        new Object[]{ firstSeenVersion, platform.getVersion() });
+                logger.log(Level.WARNING, "Multiple ports of WorldEdit are installed but they report different versions ({0} and {1}). "
+                        + "If these two versions are truly different, then you may run into unexpected crashes and errors.",
+                        new Object[]{firstSeenVersion, platform.getVersion()});
             }
         } else {
             firstSeenVersion = platform.getVersion();
@@ -142,8 +143,9 @@ public class PlatformManager {
     /**
      * Unregister a platform from WorldEdit.
      *
-     * <p>If the platform has been chosen for any capabilities, then a new
-     * platform will be found.</p>
+     * <p>
+     * If the platform has been chosen for any capabilities, then a new platform
+     * will be found.</p>
      *
      * @param platform the platform
      */
@@ -190,6 +192,11 @@ public class PlatformManager {
         if (platform != null) {
             return platform;
         } else {
+            if (preferences.isEmpty()) {
+                if (!platforms.isEmpty()) {
+                    return platforms.get(0); // Use the first available if preferences have not been decided yet.
+                }
+            }
             throw new NoCapablePlatformException("No platform was found supporting " + capability.name());
         }
     }
@@ -219,7 +226,8 @@ public class PlatformManager {
      * @param capability the capability
      * @return the most preferred platform, or null if no platform was found
      */
-    private synchronized @Nullable Platform findMostPreferred(Capability capability) {
+    private synchronized @Nullable
+    Platform findMostPreferred(Capability capability) {
         Platform preferred = null;
         Preference highest = null;
 
@@ -237,12 +245,13 @@ public class PlatformManager {
     /**
      * Get a list of loaded platforms.
      *
-     * <p>The returned list is a copy of the original and is mutable.</p>
+     * <p>
+     * The returned list is a copy of the original and is mutable.</p>
      *
      * @return a list of platforms
      */
     public synchronized List<Platform> getPlatforms() {
-        return new ArrayList<Platform>(platforms);
+        return new ArrayList<>(platforms);
     }
 
     /**
@@ -259,8 +268,8 @@ public class PlatformManager {
     }
 
     /**
-     * Given an actor, return a new one that may use a different platform
-     * for permissions and world editing.
+     * Given an actor, return a new one that may use a different platform for
+     * permissions and world editing.
      *
      * @param base the base actor to match
      * @return a new delegate actor
@@ -301,24 +310,14 @@ public class PlatformManager {
     /**
      * Get the current configuration.
      *
-     * <p>If no platform has been registered yet, then a default configuration
-     * will be returned.</p>
+     * <p>
+     * If no platform has been registered yet, then a default configuration will
+     * be returned.</p>
      *
      * @return the configuration
      */
     public LocalConfiguration getConfiguration() {
         return queryCapability(Capability.CONFIGURATION).getConfiguration();
-    }
-
-    /**
-     * Return a legacy {@link ServerInterface}.
-     *
-     * @return a {@link ServerInterface}
-     * @throws IllegalStateException if no platform has been registered
-     */
-    @SuppressWarnings("deprecation")
-    public ServerInterface getServerInterface() throws IllegalStateException {
-        return ServerInterfaceAdapter.adapt(queryCapability(Capability.USER_COMMANDS));
     }
 
     @Subscribe
@@ -329,7 +328,6 @@ public class PlatformManager {
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Subscribe
     public void handleBlockInteract(BlockInteractEvent event) {
         // Create a proxy actor with a potentially different world for
@@ -345,7 +343,7 @@ public class PlatformManager {
             LocalSession session = worldEdit.getSessionManager().get(actor);
 
             if (event.getType() == Interaction.HIT) {
-                if (player.getItemInHand() == getConfiguration().wandItem) {
+                if (player.getItemInHand(HandSide.MAIN_HAND).getType().getId().equals(getConfiguration().wandItem)) {
                     if (!session.isToolControlEnabled()) {
                         return;
                     }
@@ -372,8 +370,8 @@ public class PlatformManager {
                     }
                 }
 
-                Tool tool = session.getTool(player.getItemInHand());
-                if (tool != null && tool instanceof DoubleActionBlockTool) {
+                Tool tool = session.getTool(player.getItemInHand(HandSide.MAIN_HAND).getType());
+                if (tool instanceof DoubleActionBlockTool) {
                     if (tool.canUse(player)) {
                         ((DoubleActionBlockTool) tool).actSecondary(queryCapability(Capability.WORLD_EDITING), getConfiguration(), player, session, location);
                         event.setCancelled(true);
@@ -381,7 +379,7 @@ public class PlatformManager {
                 }
 
             } else if (event.getType() == Interaction.OPEN) {
-                if (player.getItemInHand() == getConfiguration().wandItem) {
+                if (player.getItemInHand(HandSide.MAIN_HAND).getType().getId().equals(getConfiguration().wandItem)) {
                     if (!session.isToolControlEnabled()) {
                         return;
                     }
@@ -399,8 +397,8 @@ public class PlatformManager {
                     return;
                 }
 
-                Tool tool = session.getTool(player.getItemInHand());
-                if (tool != null && tool instanceof BlockTool) {
+                Tool tool = session.getTool(player.getItemInHand(HandSide.MAIN_HAND).getType());
+                if (tool instanceof BlockTool) {
                     if (tool.canUse(player)) {
                         ((BlockTool) tool).actPrimary(queryCapability(Capability.WORLD_EDITING), getConfiguration(), player, session, location);
                         event.setCancelled(true);
@@ -410,7 +408,6 @@ public class PlatformManager {
         }
     }
 
-    @SuppressWarnings("deprecation")
     @Subscribe
     public void handlePlayerInput(PlayerInputEvent event) {
         // Create a proxy actor with a potentially different world for
@@ -419,7 +416,7 @@ public class PlatformManager {
 
         switch (event.getInputType()) {
             case PRIMARY: {
-                if (player.getItemInHand() == getConfiguration().navigationWand) {
+                if (player.getItemInHand(HandSide.MAIN_HAND).getType().getId().equals(getConfiguration().navigationWand)) {
                     if (getConfiguration().navigationWandMaxDistance <= 0) {
                         return;
                     }
@@ -428,7 +425,7 @@ public class PlatformManager {
                         return;
                     }
 
-                    WorldVector pos = player.getSolidBlockTrace(getConfiguration().navigationWandMaxDistance);
+                    Location pos = player.getSolidBlockTrace(getConfiguration().navigationWandMaxDistance);
                     if (pos != null) {
                         player.findFreePosition(pos);
                     } else {
@@ -441,8 +438,8 @@ public class PlatformManager {
 
                 LocalSession session = worldEdit.getSessionManager().get(player);
 
-                Tool tool = session.getTool(player.getItemInHand());
-                if (tool != null && tool instanceof DoubleActionTraceTool) {
+                Tool tool = session.getTool(player.getItemInHand(HandSide.MAIN_HAND).getType());
+                if (tool instanceof DoubleActionTraceTool) {
                     if (tool.canUse(player)) {
                         ((DoubleActionTraceTool) tool).actSecondary(queryCapability(Capability.WORLD_EDITING), getConfiguration(), player, session);
                         event.setCancelled(true);
@@ -454,7 +451,7 @@ public class PlatformManager {
             }
 
             case SECONDARY: {
-                if (player.getItemInHand() == getConfiguration().navigationWand) {
+                if (player.getItemInHand(HandSide.MAIN_HAND).getType().getId().equals(getConfiguration().navigationWand)) {
                     if (getConfiguration().navigationWandMaxDistance <= 0) {
                         return;
                     }
@@ -473,8 +470,8 @@ public class PlatformManager {
 
                 LocalSession session = worldEdit.getSessionManager().get(player);
 
-                Tool tool = session.getTool(player.getItemInHand());
-                if (tool != null && tool instanceof TraceTool) {
+                Tool tool = session.getTool(player.getItemInHand(HandSide.MAIN_HAND).getType());
+                if (tool instanceof TraceTool) {
                     if (tool.canUse(player)) {
                         ((TraceTool) tool).actPrimary(queryCapability(Capability.WORLD_EDITING), getConfiguration(), player, session);
                         event.setCancelled(true);
@@ -486,6 +483,5 @@ public class PlatformManager {
             }
         }
     }
-
 
 }
