@@ -70,10 +70,7 @@ public class PlatformManager {
      * the uninitialized 'this' creates other problems.*
      */
     private CommandManager commandManager;
-    private final List<Platform> platforms = new ArrayList<>();
-    private final Map<Capability, Platform> preferences = new EnumMap<>(Capability.class);
-    private @Nullable
-    String firstSeenVersion;
+    private @Nullable String firstSeenVersion;
     private final AtomicBoolean initialized = new AtomicBoolean();
     private final AtomicBoolean configured = new AtomicBoolean();
 
