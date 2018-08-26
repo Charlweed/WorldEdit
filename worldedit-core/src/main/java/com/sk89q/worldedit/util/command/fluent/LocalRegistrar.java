@@ -16,7 +16,7 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
-/*
+ /*
  * LocalRegistrar
  * Copyright (C) 2011 Charles Hymes <http://www.hymerfania.com>
  */
@@ -69,6 +69,386 @@ import java.util.zip.ZipException;
  */
 public class LocalRegistrar {
 
+    private static final List<URL> CLASS_URLS = new ArrayList<>(4);
+    private static final Logger LOGGER = Logger.getLogger(LocalRegistrar.class.getName());
+    private static final IsDirFilter DIR_FILTER = new IsDirFilter();
+    private static final IsFileFilter FILE_FILTER = new IsFileFilter();
+    private static final IsJarFilter JAR_FILTER = new IsJarFilter();
+    private static final ClassNameFilter CLASSNAME_FILTER = new ClassNameFilter();
+    private static final int MAX_DEPTH = 5;
+    public final static String WorldEdit_DATA_PATH = "plugins/WorldEdit";
+
+    public static List<String> commandAliases(Method commandMethod) {
+        List<String> result = new ArrayList<>();
+        try {
+            boolean isCommand = commandMethod.isAnnotationPresent(Command.class);
+            if (isCommand) {
+                com.sk89q.minecraft.util.commands.Command commandAnnotation = commandMethod.getAnnotation(Command.class);
+                result.addAll(Arrays.asList(commandAnnotation.aliases()));
+            } else {
+                throw new IllegalArgumentException("Method" + commandMethod.getName() + " is not annotated as a command.");
+            }
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    public static boolean hasWorldEditConstructor(Class<?> clazz) {
+        boolean result = false;
+        Class<?>[] parameterType = new Class<?>[]{WorldEdit.class};
+        try {
+            result = clazz.getConstructor(parameterType) != null;
+        } catch (NoSuchMethodException ex) {
+            LOGGER.log(Level.SEVERE, null, ex);
+        } catch (SecurityException ex) {
+            LOGGER.log(Level.SEVERE, null, ex);
+        }
+        return result;
+    }
+
+    private static Object commandInstance(Class<?> clazz, WorldEdit worldEdit) {
+        Object result = null;
+        if (hasWorldEditConstructor(clazz)) {
+            try {
+                Class<?>[] parameterType = new Class<?>[]{WorldEdit.class};
+                Object[] arguments = {worldEdit};
+                Constructor<?> constructor = clazz.getConstructor(parameterType);
+                result = constructor.newInstance(arguments);
+            } catch (InstantiationException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (IllegalAccessException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (IllegalArgumentException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (InvocationTargetException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (NoSuchMethodException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (SecurityException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            }
+        } else {
+            try {
+                result = clazz.newInstance();
+            } catch (InstantiationException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (IllegalAccessException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (IllegalArgumentException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            } catch (SecurityException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            }
+        }
+        return result;
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<Method> commandMethods(Class<?> someClass) {
+        List<Method> result = new ArrayList<>();
+        Method[] classMethods;
+        if (!CLASSNAME_FILTER.accept(someClass.getCanonicalName())) {
+            LOGGER.log(Level.WARNING, "Skipping unacceptable class {0}", someClass.getName());
+            return EMPTY_LIST;
+        }
+        try {
+            classMethods = someClass.getMethods();
+            for (Method aMethod : classMethods) {
+                boolean isCommand;
+                try {
+                    isCommand = aMethod.isAnnotationPresent(Command.class);
+                    if (isCommand) {
+                        result.add(aMethod);
+                        break;
+                    }
+                } catch (Exception ex) {
+                    LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+                }
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+        } /**
+         * Not sure why this is thrown for a loaded class, but whatever
+         */
+        catch (java.lang.NoClassDefFoundError ncdf) {
+            LOGGER.log(Level.SEVERE, "ncdf for {0}", someClass.getCanonicalName());
+            LOGGER.log(Level.SEVERE, ncdf.getMessage(), ncdf);
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    /**
+     * Calls RegisterandReturn on every Class that contains Commands, in all of
+     * the jars, in the given directory. This allows for easy deployment of Java
+     * based commands.
+     *
+     * @param platformManager The PlatformManager for this instance. May not be
+     * null, but if uninitialized, workingDirectory is set to "./"
+     * @param dispatcherNode the current dispatcher node.
+     * @param worldEdit the WorldEdit instance
+     * @return The same DispatcherNode passed as an argument.
+     */
+    public static DispatcherNode registerJaredCommands(PlatformManager platformManager, DispatcherNode dispatcherNode, WorldEdit worldEdit) {
+        checkNotNull(worldEdit);
+        checkNotNull(platformManager);
+        File workingDir;
+        File commandJarsDir;
+        /**
+         * We should use
+         * platformManager.getConfiguration().getWorkingDirectory() but at this
+         * point in the code, PlatformManager is typically uninitialized. Lucky
+         * for us, getWorkingDirectory() is currently just new File("."), so we
+         * pass the static final String WorldEdit_DATA_PATH.
+         *
+         */
+        try {
+            workingDir = platformManager.getConfiguration().getWorkingDirectory();
+        } catch (com.sk89q.worldedit.extension.platform.NoCapablePlatformException ncpe) {
+            LOGGER.warning("PlatformManager instance is not (yet) uninitialized.");
+            workingDir = new File(".");
+        }
+        try {
+            commandJarsDir = new File(workingDir, WorldEdit_DATA_PATH);
+            if (commandJarsDir.exists()) {
+                LOGGER.log(Level.INFO, "Searching directory \"{0}\" for Commands", commandJarsDir.getAbsolutePath());
+                LocalRegistrar jarRegistrar = new LocalRegistrar(dispatcherNode, commandJarsDir, worldEdit);
+                jarRegistrar.registerExtensionCommands();
+            } else {
+                LOGGER.log(Level.WARNING, "Plugin directory \"{0}\" does not (yet) exist.", commandJarsDir.toString());
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+        return dispatcherNode;
+    }
+
+    private final DispatcherNode _dispatcherNode;
+
+    private final File _extenensionsDir;
+    private final ClasspathJarAppender _loaderStub = new ClasspathJarAppender();
+    private final WorldEdit _worldEdit;
+
+    /**
+     * Creates an instance of LocalCommands. Not meant for public use, because
+     * the static method
+     *
+     * @param commandManager the CommandsManager that will register the command.
+     * @param extenensionsDir the location of the jars that contain the classes
+     * with {@code Command}s.
+     */
+    private LocalRegistrar(DispatcherNode dispatcherNode, File extenensionsDir, WorldEdit worldEdit) {
+        this._dispatcherNode = dispatcherNode;
+        this._extenensionsDir = extenensionsDir;
+        this._worldEdit = worldEdit;
+    }
+
+    /**
+     * Registers all of the commands, in all of the classes, in all of the jars,
+     * in all of all of the directories and subdirectories in the WorldEdit
+     * directory.
+     */
+    private void registerExtensionCommands() {
+        LOGGER.log(Level.FINE, getExtenensionsDir().getAbsolutePath());
+        registerExtensionCommandsInDir(getExtenensionsDir());
+    }
+
+    private void registerExtensionCommandsInDir(File extDir) {
+        LOGGER.log(Level.FINE, extDir.toString());
+
+        if (!DIR_FILTER.accept(extDir)) {
+            throw new IllegalArgumentException("File " + extDir.toString() + " is not a directory.");
+        }
+        int jarCount = extDir.listFiles(new IsJarFilter()).length;
+
+        StringBuilder jarCountMessage = new StringBuilder("Found ");
+        jarCountMessage.append(jarCount);
+        jarCountMessage.append(" jar files in ");
+        jarCountMessage.append(extDir.getAbsolutePath());
+        LOGGER.log(Level.FINE, jarCountMessage.toString());
+        /**
+         * Add All Jars to the classpath before we attempt to load any class.*
+         */
+        for (File someJar : extDir.listFiles(new IsJarFilter())) {
+            URL someJarURL;
+            try {
+                someJarURL = someJar.toURI().toURL();
+                if (!CLASS_URLS.contains(someJarURL)) {
+                    CLASS_URLS.add(someJarURL);
+                    LOGGER.log(Level.INFO, "Added {0} to classpath", someJarURL);
+                    ClasspathJarAppender.addURL(someJarURL);
+                }
+            } catch (MalformedURLException ex) {
+                LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            } catch (IOException ex) {
+                LOGGER.log(Level.SEVERE, null, ex);
+            }
+        }
+
+        for (File someJar : extDir.listFiles(new IsJarFilter())) {
+            registerExtensionCommandsInJar(someJar);
+        }
+
+        for (File aSubDir : extDir.listFiles(DIR_FILTER)) {
+            registerExtensionCommandsInDir(aSubDir);
+        }
+    }
+
+    private void registerExtensionCommandsInJar(File someJar) {
+        String entryName;
+        Class<?> entryClass;
+        LOGGER.log(Level.INFO, "Searching {0} for commands.", someJar.toString());
+
+        if (!JAR_FILTER.accept(someJar)) {
+            throw new IllegalArgumentException("File " + someJar.toString() + " is not a jar file.");
+        }
+        try {
+
+            JarFile jarfile;
+            URL someJarURL;
+            someJarURL = someJar.toURI().toURL();
+            if (!CLASS_URLS.contains(someJarURL)) {
+                CLASS_URLS.add(someJarURL);
+                LOGGER.log(Level.INFO, "Added {0} to classpath", someJarURL);
+                ClasspathJarAppender.addURL(someJarURL);
+            }
+            jarfile = new JarFile(someJar);
+            for (JarEntry someZipEntry : Collections.list(jarfile.entries())) {
+                entryName = someZipEntry.getName();
+                if (entryName.endsWith(".class") && !entryName.contains("$")) {
+                    LOGGER.log(Level.FINE, "Found class entry {0}", entryName);
+                    /**
+                     * Logger does not support {} formatting*
+                     */
+                    entryClass = classFromName(entryName);
+                    if (entryClass != null) {
+                        if (hasCommands(entryClass, 0)) {
+                            /*We can't check for commands previously registerd
+                            with the same name becuase the
+                            'keys' for the command mappings are not exposed. We can
+                            only catch the exception :(
+                             */
+                            try {
+                                LOGGER.log(Level.INFO, "Registering commands of {0}", entryClass.getName());
+                                Object cmdInstance = commandInstance(entryClass, _worldEdit);
+                                if (cmdInstance != null) {
+                                    _dispatcherNode.registerMethods(cmdInstance);
+                                } else {
+                                    LOGGER.log(Level.WARNING, "Could not instanceiate  {0}", entryClass.getName());
+                                }
+
+                            } catch (IllegalArgumentException iae) {
+                                LOGGER.log(Level.WARNING, "{0} not registered becuase it has at least one alias that has been previously registered", entryName);
+                            }
+                        } else {
+                            LOGGER.log(Level.FINE, "{0} has no methods annotated as Commands", entryName);
+                        }
+                    } else {
+                        LOGGER.log(Level.INFO, "Could not load {0}", entryName);
+                    }
+                }
+            }
+        } catch (ZipException ze) {
+            LOGGER.log(Level.SEVERE, ze.getMessage(), ze);
+        } catch (IOException ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+        }
+    }
+
+    private Class<?> classFromName(String entryName) {
+        Class<?> someclass;
+        String plainName = entryName.substring(0, entryName.length() - 6).replace("/", ".");
+        LOGGER.log(Level.FINE, "Searching for class {0}", plainName);
+        /**
+         * Logger does not support {} formatting*
+         */
+        try {
+            someclass = _loaderStub.findClass(plainName);
+        } catch (ClassNotFoundException ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            someclass = null;
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            someclass = null;
+        } catch (Exception ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            someclass = null;
+        }
+
+        return someclass;
+    }
+
+    private boolean hasCommands(final Class<?> someClass, final int depth) {
+        boolean result = false;
+        Method[] classMethods;
+        Class<?>[] innerClasses;
+        if (depth > MAX_DEPTH) {
+            return false;
+        }
+        if (!CLASSNAME_FILTER.accept(someClass.getCanonicalName())) {
+            LOGGER.log(Level.WARNING, "Skipping unacceptable class {0}", someClass.getName());
+            return false;
+        }
+        try {
+            classMethods = someClass.getMethods();
+            for (Method aMethod : classMethods) {
+                boolean isCommand;
+                try {
+                    isCommand = aMethod.isAnnotationPresent(Command.class);
+                    if (isCommand) {
+                        result = true;
+                        break;
+                    }
+                } catch (Exception ex) {
+                    LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+                }
+
+            }
+        } catch (RuntimeException ex) {
+            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+        } /**
+         * Not sure why this is thrown for a loaded class, but whatever
+         */
+        catch (java.lang.NoClassDefFoundError ncdf) {
+            LOGGER.log(Level.SEVERE, "ncdf for {0}", someClass.getCanonicalName());
+            LOGGER.log(Level.SEVERE, ncdf.getMessage(), ncdf);
+        }
+        if (!result && (depth < MAX_DEPTH)) {
+            try {
+                innerClasses = someClass.getClasses();
+                for (Class<?> innerClass : innerClasses) {
+                    if (hasCommands(innerClass, depth + 1)) {
+                        result = true;
+                        break;
+                    }
+                }
+            } /**
+             * Can't use Throwable,it enables the StackOverFlowError
+             * catastrophe*
+             */
+            catch (RuntimeException ex) {
+                LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * @return the _extenensionsDir
+     */
+    public File getExtenensionsDir() {
+        return _extenensionsDir;
+    }
+
+    /**
+     * Get the value of dispatcherNode
+     *
+     * @return the value of dispatcherNode
+     */
+    public DispatcherNode getDispatcherNode() {
+        return _dispatcherNode;
+    }
+
     private static class ClasspathJarAppender {
 
         protected ClasspathJarAppender() {
@@ -110,8 +490,7 @@ public class LocalRegistrar {
                 method.setAccessible(true);
                 method.invoke(CLASS_LOADER, new Object[]{u});
                 LOGGER.log(Level.FINE, "Successfully added {0} to classpath", u.toString());
-            }
-            /**
+            } /**
              * May have different handling of these exceptions someday**
              */
             catch (IllegalAccessException ex) {
@@ -139,13 +518,13 @@ public class LocalRegistrar {
         }
 
         protected Class<?> findClass(String name) throws ClassNotFoundException {
-            LOGGER.log(Level.FINE, "finding and loading class " + name);
+            LOGGER.log(Level.FINE, "finding and loading class {0}", name);
             Class<?> result = null;
             if (CLASSNAME_FILTER.accept(name)) {
 
                 try {
                     result = Class.forName(name);
-                    LOGGER.log(Level.FINE, "Successfully found and loaded class " + name);
+                    LOGGER.log(Level.FINE, "Successfully found and loaded class {0}", name);
                 } catch (ClassNotFoundException ncfe) {
                     result = null;
                 } catch (ExceptionInInitializerError eiie) {
@@ -160,7 +539,7 @@ public class LocalRegistrar {
                         Method method = urlClassLoaderClass.getDeclaredMethod("findClass", CLASSNAME_PARAMETER);
                         method.setAccessible(true);
                         result = (Class<?>) method.invoke(CLASS_LOADER, new Object[]{name});
-                        LOGGER.log(Level.FINE, "Successfully found and loaded class " + name);
+                        LOGGER.log(Level.FINE, "Successfully found and loaded class {0}", name);
                     } /**
                      * May have different handling of these exceptions someday**
                      */
@@ -176,7 +555,7 @@ public class LocalRegistrar {
                             throw new ClassNotFoundException(FAIL_PREFIX + name + FAIL_SUFFIX, ncdf);
                         }
                         if (ex.getCause() instanceof LinkageError) {
-                            LOGGER.log(Level.WARNING, "Not really an " + ex.getMessage() + " for " + name);
+                            LOGGER.log(Level.WARNING, "Not really an {0} for {1}", new Object[]{ex.getMessage(), name});
                         } else {
                             LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
                             throw new ClassNotFoundException(FAIL_PREFIX + name + FAIL_SUFFIX, ex);
@@ -212,8 +591,7 @@ public class LocalRegistrar {
      * *
      * Accepts any file that is a directory. Accepts Symbolic links to dirs as
      * well in Windows NT+. Symbolic links can only be truly detected in Java
-     * 1.7
-     **
+     * 1.7 *
      */
     private static class IsDirFilter extends javax.swing.filechooser.FileFilter implements java.io.FileFilter {
 
@@ -241,8 +619,7 @@ public class LocalRegistrar {
      * *
      * Accepts any file that is a plain,regular file. Makes crude attempt to
      * reject symbolic links. Often fails to detect links in Windows NT+ Can
-     * only be fixed in Java 1.7
-     **
+     * only be fixed in Java 1.7 *
      */
     private static class IsFileFilter extends javax.swing.filechooser.FileFilter implements java.io.FileFilter {
 
@@ -283,7 +660,7 @@ public class LocalRegistrar {
             }
 
             if (isSymbolicLink) {
-                LOGGER.log(Level.WARNING, file.getPath() + " is a symbolicLink");
+                LOGGER.log(Level.WARNING, "{0} is a symbolicLink", file.getPath());
                 /**
                  * Logger does not support {} *
                  */
@@ -302,7 +679,7 @@ public class LocalRegistrar {
             try {
                 result = pathname.isFile();
                 if (!result) {
-                    LOGGER.log(Level.FINEST, pathname.getPath() + " is not a file ");
+                    LOGGER.log(Level.FINEST, "{0} is not a file ", pathname.getPath());
                     /**
                      * Logger does not support {} *
                      */
@@ -319,8 +696,7 @@ public class LocalRegistrar {
     /**
      * *
      * Accepts any file that is a file, and ends in ".jar" File does not have to
-     * exist, nor be readable, etc.
-     **
+     * exist, nor be readable, etc. *
      */
     private static class IsJarFilter extends javax.swing.filechooser.FileFilter implements java.io.FileFilter {
 
@@ -404,381 +780,4 @@ public class LocalRegistrar {
             return !UNACCEPTABLE.contains(someURL);
         }
     }
-
-    /**
-     * Creates an instance of LocalCommands. Not meant for public use, because
-     * the static method
-     *
-     * @param commandManager the CommandsManager that will register the command.
-     * @param extenensionsDir the location of the jars that contain the classes
-     * with {@code Command}s.
-     */
-    private LocalRegistrar(DispatcherNode dispatcherNode, File extenensionsDir, WorldEdit worldEdit) {
-        this._dispatcherNode = dispatcherNode;
-        this._extenensionsDir = extenensionsDir;
-        this._worldEdit = worldEdit;
-    }
-
-    /**
-     * Registers all of the commands, in all of the classes, in all of the jars,
-     * in all of all of the directories and subdirectories in the WorldEdit
-     * directory.
-     */
-    private void registerExtensionCommands() {
-        LOGGER.log(Level.FINE, getExtenensionsDir().getAbsolutePath());
-        registerExtensionCommandsInDir(getExtenensionsDir());
-    }
-
-    private void registerExtensionCommandsInDir(File extDir) {
-        LOGGER.log(Level.FINE, extDir.toString());
-
-        if (!DIR_FILTER.accept(extDir)) {
-            throw new IllegalArgumentException("File " + extDir.toString() + " is not a directory.");
-        }
-        int jarCount = extDir.listFiles(new IsJarFilter()).length;
-
-        StringBuilder jarCountMessage = new StringBuilder("Found ");
-        jarCountMessage.append(jarCount);
-        jarCountMessage.append(" jar files in ");
-        jarCountMessage.append(extDir.getAbsolutePath());
-        LOGGER.log(Level.FINE, jarCountMessage.toString());
-        /**
-         * Add All Jars to the classpath before we attempt to load any class.*
-         */
-        for (File someJar : extDir.listFiles(new IsJarFilter())) {
-            URL someJarURL;
-            try {
-                someJarURL = someJar.toURI().toURL();
-                if (!CLASS_URLS.contains(someJarURL)) {
-                    CLASS_URLS.add(someJarURL);
-                    LOGGER.log(Level.INFO, "Added " + someJarURL + " to classpath");
-                    ClasspathJarAppender.addURL(someJarURL);
-                }
-            } catch (MalformedURLException ex) {
-                LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-            } catch (IOException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            }
-        }
-
-        for (File someJar : extDir.listFiles(new IsJarFilter())) {
-            registerExtensionCommandsInJar(someJar);
-        }
-
-        for (File aSubDir : extDir.listFiles(DIR_FILTER)) {
-            registerExtensionCommandsInDir(aSubDir);
-        }
-    }
-
-    private void registerExtensionCommandsInJar(File someJar) {
-        String entryName;
-        Class<?> entryClass;
-        LOGGER.log(Level.INFO, "Searching " + someJar.toString() + " for commands.");
-
-        if (!JAR_FILTER.accept(someJar)) {
-            throw new IllegalArgumentException("File " + someJar.toString() + " is not a jar file.");
-        }
-        try {
-
-            JarFile jarfile;
-            URL someJarURL;
-            someJarURL = someJar.toURI().toURL();
-            if (!CLASS_URLS.contains(someJarURL)) {
-                CLASS_URLS.add(someJarURL);
-                LOGGER.log(Level.INFO, "Added " + someJarURL + " to classpath");
-                ClasspathJarAppender.addURL(someJarURL);
-            }
-            jarfile = new JarFile(someJar);
-            for (JarEntry someZipEntry : Collections.list(jarfile.entries())) {
-                entryName = someZipEntry.getName();
-                if (entryName.endsWith(".class") && !entryName.contains("$")) {
-                    LOGGER.log(Level.FINE, "Found class entry " + entryName);
-                    /**
-                     * Logger does not support {} formatting*
-                     */
-                    entryClass = classFromName(entryName);
-                    if (entryClass != null) {
-                        if (hasCommands(entryClass, 0)) {
-                            /*We can't check for commands previously registerd 
-                             with the same name becuase the 
-                             'keys' for the command mappings are not exposed. We can
-                             only catch the exception :( 
-                             */
-                            try {
-                                LOGGER.log(Level.INFO, "Registering commands of " + entryClass.getName());
-                                Object cmdInstance = commandInstance(entryClass, _worldEdit);
-                                if (cmdInstance != null) {
-                                    _dispatcherNode.registerMethods(cmdInstance);
-                                } else {
-                                    LOGGER.log(Level.WARNING, "Could not instanceiate  " + entryClass.getName());
-                                }
-
-                            } catch (IllegalArgumentException iae) {
-                                LOGGER.log(Level.WARNING, entryName + " not registered becuase it has at least one alias that has been previously registered");
-                            }
-                        } else {
-                            LOGGER.log(Level.FINE, entryName + " has no methods annotated as Commands");
-                        }
-                    } else {
-                        LOGGER.log(Level.INFO, "Could not load " + entryName);
-                    }
-                }
-            }
-        } catch (ZipException ze) {
-            LOGGER.log(Level.SEVERE, ze.getMessage(), ze);
-        } catch (IOException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-        }
-    }
-
-    private Class<?> classFromName(String entryName) {
-        Class<?> someclass;
-        String plainName = entryName.substring(0, entryName.length() - 6).replace("/", ".");
-        LOGGER.log(Level.FINE, "Searching for class " + plainName);
-        /**
-         * Logger does not support {} formatting*
-         */
-        try {
-            someclass = _loaderStub.findClass(plainName);
-        } catch (ClassNotFoundException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-            someclass = null;
-        } catch (RuntimeException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-            someclass = null;
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-            someclass = null;
-        }
-
-        return someclass;
-    }
-
-    private boolean hasCommands(final Class<?> someClass, final int depth) {
-        boolean result = false;
-        Method[] classMethods;
-        Class<?>[] innerClasses;
-        if (depth > MAX_DEPTH) {
-            return false;
-        }
-        if (!CLASSNAME_FILTER.accept(someClass.getCanonicalName())) {
-            LOGGER.log(Level.WARNING, "Skipping unacceptable class " + someClass.getName());
-            return false;
-        }
-        try {
-            classMethods = someClass.getMethods();
-            for (Method aMethod : classMethods) {
-                boolean isCommand = false;
-                try {
-                    isCommand = aMethod.isAnnotationPresent(Command.class);
-                    if (isCommand) {
-                        result = true;
-                        break;
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-                }
-
-            }
-        } catch (RuntimeException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-        }
-        /**
-         * Not sure why this is thrown for a loaded class, but whatever
-         */
-        catch (java.lang.NoClassDefFoundError ncdf) {
-            LOGGER.log(Level.SEVERE, "ncdf for " + someClass.getCanonicalName());
-            LOGGER.log(Level.SEVERE, ncdf.getMessage(), ncdf);
-        }
-        if (!result && (depth < MAX_DEPTH)) {
-            try {
-                innerClasses = someClass.getClasses();
-                for (Class<?> innerClass : innerClasses) {
-                    if (hasCommands(innerClass, depth + 1)) {
-                        result = true;
-                        break;
-                    }
-                }
-            } /**
-             * Can't use Throwable,it enables the StackOverFlowError catastrophe*
-             */
-            catch (RuntimeException ex) {
-                LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-            }
-        }
-        return result;
-    }
-
-    public static List<String> commandAliases(Method commandMethod) {
-        List<String> result = new ArrayList<String>();
-        try {
-            boolean isCommand = commandMethod.isAnnotationPresent(Command.class);
-            if (isCommand) {
-                com.sk89q.minecraft.util.commands.Command commandAnnotation = commandMethod.getAnnotation(Command.class);
-                result.addAll(Arrays.asList(commandAnnotation.aliases()));
-            } else {
-                throw new IllegalArgumentException("Method" + commandMethod.getName() + " is not annotated as a command.");
-            }
-        } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-        }
-        return Collections.unmodifiableList(result);
-    }
-
-    public static boolean hasWorldEditConstructor(Class<?> clazz) {
-        boolean result = false;
-        Class<?>[] parameterType = new Class<?>[]{WorldEdit.class};
-        try {
-            result = clazz.getConstructor(parameterType) != null;
-        } catch (NoSuchMethodException ex) {
-            LOGGER.log(Level.SEVERE, null, ex);
-        } catch (SecurityException ex) {
-            LOGGER.log(Level.SEVERE, null, ex);
-        }
-        return result;
-    }
-
-    private static Object commandInstance(Class<?> clazz, WorldEdit worldEdit) {
-        Object result = null;
-        if (hasWorldEditConstructor(clazz)) {
-            try {
-                Class<?>[] parameterType = new Class<?>[]{WorldEdit.class};
-                Object[] arguments = {worldEdit};
-                Constructor<?> constructor = clazz.getConstructor(parameterType);
-                result = constructor.newInstance(arguments);
-            } catch (InstantiationException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (IllegalAccessException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (IllegalArgumentException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (InvocationTargetException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (NoSuchMethodException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (SecurityException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            }
-        } else {
-            try {
-                result = clazz.newInstance();
-            } catch (InstantiationException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (IllegalAccessException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (IllegalArgumentException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            } catch (SecurityException ex) {
-                LOGGER.log(Level.SEVERE, null, ex);
-            }
-        }
-        return result;
-    }
-
-    @SuppressWarnings("unchecked")
-    public static List<Method> commandMethods(Class<?> someClass) {
-        List<Method> result = new ArrayList<Method>();
-        Method[] classMethods;
-        if (!CLASSNAME_FILTER.accept(someClass.getCanonicalName())) {
-            LOGGER.log(Level.WARNING, "Skipping unacceptable class {0}", someClass.getName());
-            return EMPTY_LIST;
-        }
-        try {
-            classMethods = someClass.getMethods();
-            for (Method aMethod : classMethods) {
-                boolean isCommand;
-                try {
-                    isCommand = aMethod.isAnnotationPresent(Command.class);
-                    if (isCommand) {
-                        result.add(aMethod);
-                        break;
-                    }
-                } catch (Exception ex) {
-                    LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-                }
-            }
-        } catch (RuntimeException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-        } /**
-         * Not sure why this is thrown for a loaded class, but whatever
-         */
-        catch (java.lang.NoClassDefFoundError ncdf) {
-            LOGGER.log(Level.SEVERE, "ncdf for {0}", someClass.getCanonicalName());
-            LOGGER.log(Level.SEVERE, ncdf.getMessage(), ncdf);
-        }
-        return Collections.unmodifiableList(result);
-    }
-
-    /**
-     * Calls RegisterandReturn on every Class that contains Commands, in all of
-     * the jars, in the given directory. This allows for easy deployment of Java
-     * based commands.
-     *
-     * @param platformManager The PlatformManager for this instance. May not 
-     *  be null, but if uninitialized, workingDirectory is set to "./"
-     * @param dispatcherNode the current dispatcher node.
-     * @param worldEdit the WorldEdit instance
-     * @return The same DispatcherNode passed as an argument.
-     */
-    public static DispatcherNode registerJaredCommands(PlatformManager platformManager, DispatcherNode dispatcherNode, WorldEdit worldEdit) {
-        checkNotNull(worldEdit);
-        checkNotNull(platformManager);        
-        File workingDir;
-        File commandJarsDir;
-       /**We should use platformManager.getConfiguration().getWorkingDirectory()
-        * but at this point in the code, PlatformManager is typically uninitialized.
-        * Lucky for us, getWorkingDirectory() is currently just new File("."),
-        * so we pass the static final String WorldEdit_DATA_PATH.
-        **/        
-        try{
-            workingDir = platformManager.getConfiguration().getWorkingDirectory();
-        }
-        catch(com.sk89q.worldedit.extension.platform.NoCapablePlatformException ncpe){
-            LOGGER.warning("PlatformManager instance is not (yet) uninitialized.");
-            workingDir = new File(".");
-        }        
-        try {
-            commandJarsDir = new File(workingDir,WorldEdit_DATA_PATH);
-            if (commandJarsDir.exists()) {
-                LOGGER.log(Level.INFO, "Searching directory \"{0}\" for Commands", commandJarsDir.getAbsolutePath());
-                LocalRegistrar jarRegistrar = new LocalRegistrar(dispatcherNode, commandJarsDir, worldEdit);
-                jarRegistrar.registerExtensionCommands();
-            } else {
-                LOGGER.log(Level.WARNING, "Plugin directory \"{0}\" does not (yet) exist.", commandJarsDir.toString());
-            }
-        } catch (RuntimeException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
-        }
-        return dispatcherNode;
-    }
-
-    /**
-     * @return the _extenensionsDir
-     */
-    public File getExtenensionsDir() {
-        return _extenensionsDir;
-    }
-
-    private final DispatcherNode _dispatcherNode;
-
-    /**
-     * Get the value of dispatcherNode
-     *
-     * @return the value of dispatcherNode
-     */
-    public DispatcherNode getDispatcherNode() {
-        return _dispatcherNode;
-    }
-
-    private final File _extenensionsDir;
-    private static final List<URL> CLASS_URLS = new ArrayList<URL>(4);
-    private static final Logger LOGGER = Logger.getLogger(LocalRegistrar.class.getName());
-    private static final IsDirFilter DIR_FILTER = new IsDirFilter();
-    private static final IsFileFilter FILE_FILTER = new IsFileFilter();
-    private static final IsJarFilter JAR_FILTER = new IsJarFilter();
-    private static final ClassNameFilter CLASSNAME_FILTER = new ClassNameFilter();
-    private final ClasspathJarAppender _loaderStub = new ClasspathJarAppender();
-    private static final int MAX_DEPTH = 5;
-    private final WorldEdit _worldEdit;
-    public final static String WorldEdit_DATA_PATH="plugins/WorldEdit";
 }
