@@ -111,7 +111,7 @@ public class DispatcherNode {
             LocalRegistrar.registerJaredCommands(platformManager, this, worldEdit);
 
         } catch (Exception ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            Logger.getLogger(System.class.getCanonicalName()).log(Level.SEVERE, null, ex);
         }
         return this;
     }  
