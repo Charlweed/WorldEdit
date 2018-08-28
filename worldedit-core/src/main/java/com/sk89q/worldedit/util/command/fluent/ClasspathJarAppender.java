@@ -96,8 +96,7 @@ public class ClasspathJarAppender {
         Class<?> result = null;
         if (filter.test(name)) {
             try {
-                result = null;
-//                result = Class.forName(name, true, jarRegistrarLoader);
+                result = Class.forName(name, true, jarRegistrarLoader);
             } //May have different handling of these exceptions someday
             catch (SecurityException ex) {
                 LOG.log(Level.SEVERE, ex.getMessage(), ex);
@@ -108,9 +107,6 @@ public class ClasspathJarAppender {
             } catch (Exception ex) {
                 LOG.log(Level.SEVERE, ex.getMessage(), ex);
                 throw new ClassNotFoundException(FAIL_PREFIX + name + FAIL_SUFFIX, ex);
-            } catch (Throwable thrown) {
-                LOG.log(Level.SEVERE, thrown.getMessage(), thrown);
-                throw new ClassNotFoundException(FAIL_PREFIX + name + FAIL_SUFFIX, thrown);
             } finally {
                 System.out.flush();
             }
