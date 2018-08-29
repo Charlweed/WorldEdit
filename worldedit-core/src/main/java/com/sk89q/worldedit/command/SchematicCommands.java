@@ -87,9 +87,8 @@ public class SchematicCommands {
             desc = "Load a schematic into your clipboard",
             min = 1, max = 2
     )
-    @Deprecated
     @CommandPermissions({ "worldedit.clipboard.load", "worldedit.schematic.load" })
-    public void load(Player player, LocalSession session, @Optional("schematic") String formatName, String filename) throws FilenameException {
+    public void load(Player player, LocalSession session, @Optional("sponge") String formatName, String filename) throws FilenameException {
         LocalConfiguration config = worldEdit.getConfiguration();
 
         File dir = worldEdit.getWorkingDirectoryFile(config.saveDir);
@@ -131,7 +130,6 @@ public class SchematicCommands {
             desc = "Save a schematic into your clipboard",
             min = 1, max = 2
     )
-    @Deprecated
     @CommandPermissions({ "worldedit.clipboard.save", "worldedit.schematic.save" })
     public void save(Player player, LocalSession session, @Optional("sponge") String formatName, String filename) throws CommandException, WorldEditException {
         LocalConfiguration config = worldEdit.getConfiguration();

@@ -19,7 +19,7 @@
 
 package com.sk89q.worldedit.bukkit;
 
-import com.sk89q.worldedit.blocks.BlockMaterial;
+import com.sk89q.worldedit.world.registry.BlockMaterial;
 import com.sk89q.worldedit.registry.state.Property;
 import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.registry.BundledBlockRegistry;
@@ -58,6 +58,18 @@ public class BukkitBlockRegistry extends BundledBlockRegistry {
         public BukkitBlockMaterial(@Nullable BlockMaterial material, Material bukkitMaterial) {
             super(material);
             this.material = bukkitMaterial;
+        }
+
+        @Override
+        public boolean isAir() {
+            switch (material) {
+                case AIR:
+                case CAVE_AIR:
+                case VOID_AIR:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         @Override

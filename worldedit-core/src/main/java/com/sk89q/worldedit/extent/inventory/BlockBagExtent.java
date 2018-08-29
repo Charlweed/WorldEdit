@@ -26,7 +26,6 @@ import com.sk89q.worldedit.extent.Extent;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockStateHolder;
 import com.sk89q.worldedit.world.block.BlockType;
-import com.sk89q.worldedit.world.block.BlockTypes;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -87,7 +86,7 @@ public class BlockBagExtent extends AbstractDelegateExtent {
         if (blockBag != null) {
             BlockState existing = getExtent().getBlock(position);
 
-            if (block.getBlockType() != BlockTypes.AIR) {
+            if (!block.getBlockType().getMaterial().isAir()) {
                 try {
                     blockBag.fetchPlacedBlock(block.toImmutableState());
                 } catch (UnplaceableBlockException e) {
@@ -102,7 +101,7 @@ public class BlockBagExtent extends AbstractDelegateExtent {
                 }
             }
 
-            if (existing.getBlockType() != BlockTypes.AIR) {
+            if (!existing.getBlockType().getMaterial().isAir()) {
                 try {
                     blockBag.storeDroppedBlock(existing);
                 } catch (BlockBagException ignored) {

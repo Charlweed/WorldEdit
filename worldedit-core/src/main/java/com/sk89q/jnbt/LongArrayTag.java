@@ -17,29 +17,44 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-package com.sk89q.worldedit.function.mask;
+package com.sk89q.jnbt;
 
-import com.sk89q.worldedit.Vector;
-import com.sk89q.worldedit.blocks.Blocks;
-import com.sk89q.worldedit.extent.Extent;
-import com.sk89q.worldedit.world.block.BlockStateHolder;
+import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.util.Collection;
+/**
+ * The {@code TAG_Long_Array} tag.
+ */
+public class LongArrayTag extends Tag {
 
-public class FuzzyBlockMask extends BlockMask {
+    private final long[] value;
 
-    public FuzzyBlockMask(Extent extent, Collection<BlockStateHolder> blocks) {
-        super(extent, blocks);
-    }
-
-    public FuzzyBlockMask(Extent extent, BlockStateHolder... block) {
-        super(extent, block);
+    /**
+     * Creates the tag with an empty name.
+     *
+     * @param value the value of the tag
+     */
+    public LongArrayTag(long[] value) {
+        super();
+        checkNotNull(value);
+        this.value = value;
     }
 
     @Override
-    public boolean test(Vector vector) {
-        Extent extent = getExtent();
-        Collection<BlockStateHolder> blocks = getBlocks();
-        return Blocks.containsFuzzy(blocks, extent.getFullBlock(vector));
+    public long[] getValue() {
+        return value;
     }
+
+    @Override
+    public String toString() {
+        StringBuilder hex = new StringBuilder();
+        for (long b : value) {
+            String hexDigits = Long.toHexString(b).toUpperCase();
+            if (hexDigits.length() == 1) {
+                hex.append("0");
+            }
+            hex.append(hexDigits).append(" ");
+        }
+        return "TAG_Long_Array(" + hex + ")";
+    }
+
 }

@@ -26,7 +26,6 @@ import com.sk89q.worldedit.extent.inventory.OutOfBlocksException;
 import com.sk89q.worldedit.extent.inventory.OutOfSpaceException;
 import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.world.block.BlockTypes;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
@@ -64,7 +63,7 @@ public class BukkitPlayerBlockBag extends BlockBag {
 
     @Override
     public void fetchBlock(BlockState blockState) throws BlockBagException {
-        if (blockState.getBlockType() == BlockTypes.AIR) {
+        if (blockState.getBlockType().getMaterial().isAir()) {
             throw new IllegalArgumentException("Can't fetch air block");
         }
 
@@ -108,7 +107,7 @@ public class BukkitPlayerBlockBag extends BlockBag {
 
     @Override
     public void storeBlock(BlockState blockState, int amount) throws BlockBagException {
-        if (blockState.getBlockType() == BlockTypes.AIR) {
+        if (blockState.getBlockType().getMaterial().isAir()) {
             throw new IllegalArgumentException("Can't store air block");
         }
         if (!blockState.getBlockType().hasItemType()) {

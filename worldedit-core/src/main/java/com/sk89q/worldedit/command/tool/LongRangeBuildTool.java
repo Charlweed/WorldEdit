@@ -26,19 +26,19 @@ import com.sk89q.worldedit.MaxChangedBlocksException;
 import com.sk89q.worldedit.entity.Player;
 import com.sk89q.worldedit.extension.platform.Actor;
 import com.sk89q.worldedit.extension.platform.Platform;
+import com.sk89q.worldedit.function.pattern.Pattern;
 import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.world.block.BlockStateHolder;
-import com.sk89q.worldedit.world.block.BlockTypes;
 
 /**
  * A tool that can place (or remove) blocks at a distance.
  */
 public class LongRangeBuildTool extends BrushTool implements DoubleActionTraceTool {
 
-    private BlockStateHolder primary;
-    private BlockStateHolder secondary;
+    private Pattern primary;
+    private Pattern secondary;
 
-    public LongRangeBuildTool(BlockStateHolder primary, BlockStateHolder secondary) {
+    public LongRangeBuildTool(Pattern secondary, Pattern primary) {
         super("worldedit.tool.lrbuild");
         this.primary = primary;
         this.secondary = secondary;
@@ -55,7 +55,8 @@ public class LongRangeBuildTool extends BrushTool implements DoubleActionTraceTo
         if (pos == null) return false;
         EditSession eS = session.createEditSession(player);
         try {
-            if (secondary.getBlockType() == BlockTypes.AIR) {
+            BlockStateHolder applied = secondary.apply(pos.toVector());
+            if (applied.getBlockType().getMaterial().isAir()) {
                 eS.setBlock(pos.toVector(), secondary);
             } else {
                 eS.setBlock(pos.getDirection(), secondary);
@@ -74,7 +75,8 @@ public class LongRangeBuildTool extends BrushTool implements DoubleActionTraceTo
         if (pos == null) return false;
         EditSession eS = session.createEditSession(player);
         try {
-            if (primary.getBlockType() == BlockTypes.AIR) {
+            BlockStateHolder applied = primary.apply(pos.toVector());
+            if (applied.getBlockType().getMaterial().isAir()) {
                 eS.setBlock(pos.toVector(), primary);
             } else {
                 eS.setBlock(pos.getDirection(), primary);

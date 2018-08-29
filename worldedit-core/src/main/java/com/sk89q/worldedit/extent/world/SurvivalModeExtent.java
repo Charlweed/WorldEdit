@@ -27,7 +27,6 @@ import com.sk89q.worldedit.extent.AbstractDelegateExtent;
 import com.sk89q.worldedit.extent.Extent;
 import com.sk89q.worldedit.world.World;
 import com.sk89q.worldedit.world.block.BlockStateHolder;
-import com.sk89q.worldedit.world.block.BlockTypes;
 
 /**
  * Makes changes to the world as if a player had done so during survival mode.
@@ -81,7 +80,7 @@ public class SurvivalModeExtent extends AbstractDelegateExtent {
 
     @Override
     public boolean setBlock(Vector location, BlockStateHolder block) throws WorldEditException {
-        if (toolUse && block.getBlockType() == BlockTypes.AIR) {
+        if (toolUse && block.getBlockType().getMaterial().isAir()) {
             world.simulateBlockMine(location);
             return true;
         } else {

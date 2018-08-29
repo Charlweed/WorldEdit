@@ -21,6 +21,7 @@ package com.sk89q.worldedit.extent.clipboard.io;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.collect.Maps;
 import com.sk89q.jnbt.ByteArrayTag;
 import com.sk89q.jnbt.CompoundTag;
 import com.sk89q.jnbt.IntArrayTag;
@@ -34,7 +35,6 @@ import com.sk89q.worldedit.BlockVector;
 import com.sk89q.worldedit.Vector;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.WorldEditException;
-import com.sk89q.worldedit.blocks.BaseBlock;
 import com.sk89q.worldedit.extension.input.InputParseException;
 import com.sk89q.worldedit.extension.input.ParserContext;
 import com.sk89q.worldedit.extent.clipboard.BlockArrayClipboard;
@@ -196,13 +196,19 @@ public class SpongeSchematicReader extends NBTSchematicReader {
             BlockVector pt = new BlockVector(x, y, z);
             try {
                 if (tileEntitiesMap.containsKey(pt)) {
-                    Map<String, Tag> values = tileEntitiesMap.get(pt);
+                    Map<String, Tag> values = Maps.newHashMap(tileEntitiesMap.get(pt));
                     for (NBTCompatibilityHandler handler : COMPATIBILITY_HANDLERS) {
                         if (handler.isAffectedBlock(state)) {
                             handler.updateNBT(state, values);
                         }
                     }
-                    clipboard.setBlock(pt, new BaseBlock(state, new CompoundTag(values)));
+                    values.put("x", new IntTag(pt.getBlockX()));
+                    values.put("y", new IntTag(pt.getBlockY()));
+                    values.put("z", new IntTag(pt.getBlockZ()));
+                    values.put("id", values.get("Id"));
+                    values.remove("Id");
+                    values.remove("Pos");
+                    clipboard.setBlock(pt, state.toBaseBlock(new CompoundTag(values)));
                 } else {
                     clipboard.setBlock(pt, state);
                 }

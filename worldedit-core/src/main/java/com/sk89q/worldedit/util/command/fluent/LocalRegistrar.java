@@ -75,7 +75,7 @@ import java.util.Map;
  */
 public class LocalRegistrar {
 
-    private static final Logger LOGGER = Logger.getLogger(System.class.getName());//Local Logger does not work yet.
+    private static final Logger LOGGER = Logger.getLogger(System.class.getName());//Local Logger does not work at the lifecycle poine where this is called.
     private static final IsDirFilter DIR_FILTER = new IsDirFilter();
     private static final IsFileFilter FILE_FILTER = new IsFileFilter();
     private static final IsJarFilter JAR_FILTER = new IsJarFilter();

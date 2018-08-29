@@ -19,11 +19,11 @@
 
 package com.sk89q.worldedit.extension.platform;
 
+import com.sk89q.worldedit.NotABlockException;
 import com.sk89q.worldedit.PlayerDirection;
 import com.sk89q.worldedit.Vector;
 import com.sk89q.worldedit.WorldEditException;
-import com.sk89q.worldedit.blocks.BaseBlock;
-import com.sk89q.worldedit.blocks.BlockType;
+import com.sk89q.worldedit.world.block.BaseBlock;
 import com.sk89q.worldedit.entity.Player;
 import com.sk89q.worldedit.extent.Extent;
 import com.sk89q.worldedit.internal.cui.CUIEvent;
@@ -33,6 +33,7 @@ import com.sk89q.worldedit.util.TargetBlock;
 import com.sk89q.worldedit.util.auth.AuthorizationException;
 import com.sk89q.worldedit.world.block.BlockState;
 import com.sk89q.worldedit.world.block.BlockStateHolder;
+import com.sk89q.worldedit.world.block.BlockType;
 import com.sk89q.worldedit.world.block.BlockTypes;
 import com.sk89q.worldedit.world.gamemode.GameMode;
 import com.sk89q.worldedit.world.gamemode.GameModes;
@@ -112,9 +113,7 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
 
             if (free == 2) {
                 if (y - 1 != origY) {
-                    final Vector pos = new Vector(x, y - 2, z);
-                    final BlockState state = world.getBlock(pos);
-                    setPosition(new Vector(x + 0.5, y - 2 + BlockType.centralTopLimit(state), z + 0.5));
+                    setPosition(new Vector(x + 0.5, y - 2 + 1, z + 0.5));
                 }
 
                 return;
@@ -135,7 +134,7 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
             final Vector pos = new Vector(x, y, z);
             final BlockState id = world.getBlock(pos);
             if (id.getBlockType().getMaterial().isMovementBlocker()) {
-                setPosition(new Vector(x + 0.5, y + BlockType.centralTopLimit(id), z + 0.5));
+                setPosition(new Vector(x + 0.5, y + 1, z + 0.5));
                 return;
             }
 
@@ -178,7 +177,7 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
                         return false;
                     }
 
-                    setPosition(platform.add(0.5, BlockType.centralTopLimit(block), 0.5));
+                    setPosition(platform.add(0.5, 1, 0.5));
                     return true;
                 }
             }
@@ -213,12 +212,12 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
                 while (y >= 0) {
                     final Vector platform = new Vector(x, y, z);
                     final BlockStateHolder block = world.getBlock(platform);
-                    final com.sk89q.worldedit.world.block.BlockType type = block.getBlockType();
+                    final BlockType type = block.getBlockType();
 
                     // Don't want to end up in lava
-                    if (type != BlockTypes.AIR && type != BlockTypes.LAVA) {
+                    if (!type.getMaterial().isAir() && type != BlockTypes.LAVA) {
                         // Found a block!
-                        setPosition(platform.add(0.5, BlockType.centralTopLimit(block), 0.5));
+                        setPosition(platform.add(0.5, 1, 0.5));
                         return true;
                     }
 
@@ -249,7 +248,7 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
         Extent world = getLocation().getExtent();
 
         // No free space above
-        if (world.getBlock(new Vector(x, y, z)).getBlockType() != BlockTypes.AIR) {
+        if (!world.getBlock(new Vector(x, y, z)).getBlockType().getMaterial().isAir()) {
             return false;
         }
 
@@ -301,7 +300,10 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
     @Override
     public void floatAt(int x, int y, int z, boolean alwaysGlass) {
         try {
-            getLocation().getExtent().setBlock(new Vector(x, y - 1, z), BlockTypes.GLASS.getDefaultState());
+            Vector spot = new Vector(x, y - 1, z);
+            if (!getLocation().getExtent().getBlock(spot).getBlockType().getMaterial().isMovementBlocker()) {
+                getLocation().getExtent().setBlock(spot, BlockTypes.GLASS.getDefaultState());
+            }
         } catch (WorldEditException e) {
             e.printStackTrace();
         }
@@ -367,9 +369,9 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
     public BaseBlock getBlockInHand(HandSide handSide) throws WorldEditException {
         final ItemType typeId = getItemInHand(handSide).getType();
         if (typeId.hasBlockType()) {
-            return new BaseBlock(typeId.getBlockType());
+            return typeId.getBlockType().getDefaultState().toBaseBlock();
         } else {
-            return new BaseBlock(BlockTypes.AIR);
+            throw new NotABlockException();
         }
     }
 
@@ -496,4 +498,8 @@ public abstract class AbstractPlayerActor implements Actor, Player, Cloneable {
         return false;
     }
 
+    @Override
+    public void sendFakeBlock(Vector pos, BlockStateHolder block) {
+
+    }
 }

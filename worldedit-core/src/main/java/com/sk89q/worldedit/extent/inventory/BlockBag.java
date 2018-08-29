@@ -21,7 +21,6 @@ package com.sk89q.worldedit.extent.inventory;
 
 import com.sk89q.worldedit.util.Location;
 import com.sk89q.worldedit.world.block.BlockState;
-import com.sk89q.worldedit.world.block.BlockTypes;
 
 /**
  * Represents a source to get blocks from and store removed ones.
@@ -37,7 +36,7 @@ public abstract class BlockBag {
     public void storeDroppedBlock(BlockState blockState) throws BlockBagException {
         BlockState dropped = blockState; // TODO BlockType.getBlockBagItem(id, data);
         if (dropped == null) return;
-        if (dropped.getBlockType() == BlockTypes.AIR) return;
+        if (dropped.getBlockType().getMaterial().isAir()) return;
 
         storeBlock(dropped);
     }
@@ -51,33 +50,13 @@ public abstract class BlockBag {
     public void fetchPlacedBlock(BlockState blockState) throws BlockBagException {
         try {
             // Blocks that can't be fetched...
-//            TODO switch (id) {
-//            case BlockID.BEDROCK:
-//            case BlockID.GOLD_ORE:
-//            case BlockID.IRON_ORE:
-//            case BlockID.COAL_ORE:
-//            case BlockID.DIAMOND_ORE:
-//            case BlockID.TNT:
-//            case BlockID.MOB_SPAWNER:
-//            case BlockID.CROPS:
-//            case BlockID.REDSTONE_ORE:
-//            case BlockID.GLOWING_REDSTONE_ORE:
-//            case BlockID.SNOW:
-//            case BlockID.LIGHTSTONE:
-//            case BlockID.PORTAL:
-//                throw new UnplaceableBlockException();
-//
-//            case BlockID.WATER:
-//            case BlockID.STATIONARY_WATER:
-//            case BlockID.LAVA:
-//            case BlockID.STATIONARY_LAVA:
-//                // Override liquids
-//                return;
-//            }
+            if (blockState.getBlockType().getMaterial().isReplacedDuringPlacement()) {
+                return;
+            }
             fetchBlock(blockState);
         } catch (OutOfBlocksException e) {
             BlockState placed = blockState;// TODO BlockType.getBlockBagItem(id, data);
-            if (placed == null || placed.getBlockType() == BlockTypes.AIR) throw e; // TODO: check
+            if (placed == null || placed.getBlockType().getMaterial().isAir()) throw e; // TODO: check
 
             fetchBlock(placed);
         }

@@ -24,7 +24,7 @@ import static com.sk89q.worldedit.event.platform.Interaction.OPEN;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.sk89q.worldedit.blocks.BaseBlock;
+import com.sk89q.worldedit.world.block.BaseBlock;
 import com.sk89q.worldedit.blocks.BaseItem;
 import com.sk89q.worldedit.entity.Player;
 import com.sk89q.worldedit.event.platform.BlockInteractEvent;
@@ -500,10 +500,10 @@ public class WorldEdit {
             int size = missingBlocks.size();
             int i = 0;
 
-            for (BlockType id : missingBlocks.keySet()) {
-                str.append(id.getName());
+            for (Map.Entry<BlockType, Integer> blockTypeIntegerEntry : missingBlocks.entrySet()) {
+                str.append((blockTypeIntegerEntry.getKey()).getName());
 
-                str.append(" [Amt: ").append(missingBlocks.get(id)).append("]");
+                str.append(" [Amt: ").append(blockTypeIntegerEntry.getValue()).append("]");
 
                 ++i;
 
@@ -578,7 +578,7 @@ public class WorldEdit {
         Request.reset();
 
         String filename = f.getPath();
-        int index = filename.lastIndexOf(".");
+        int index = filename.lastIndexOf('.');
         String ext = filename.substring(index + 1);
 
         if (!ext.equalsIgnoreCase("js")) {
