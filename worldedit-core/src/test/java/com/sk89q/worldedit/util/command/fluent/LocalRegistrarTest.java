@@ -40,22 +40,6 @@ public class LocalRegistrarTest {
     public LocalRegistrarTest() {
     }
     
-    @BeforeClass
-    public static void setUpClass() {
-    }
-    
-    @AfterClass
-    public static void tearDownClass() {
-    }
-    
-    @Before
-    public void setUp() {
-    }
-    
-    @After
-    public void tearDown() {
-    }
-
     /**
      * Test of commandAliases method, of class LocalRegistrar.
      */
@@ -79,34 +63,4 @@ public class LocalRegistrarTest {
         boolean result = LocalRegistrar.hasWorldEditConstructor(clazz);
         assertEquals(expResult, result);
     }
-
-    /**
-     * Test of commandMethods method, of class LocalRegistrar.
-     */
-    @Test
-    public void testCommandMethods() {
-        System.out.println("commandMethods");
-        Class<CommandSample00> someClass = CommandSample00.class;
-        List<Method> expResult = CommandSample00.COMMAND_METHODS;
-        List<Method> result = LocalRegistrar.commandMethods(someClass);
-        assertEquals(expResult, result);
-    }
-
-//    /**
-//     * Test of registerJaredCommands method, of class LocalRegistrar.
-//     */
-//    @Test
-//    public void testRegisterJaredCommands() {
-//        System.out.println("registerJaredCommands");
-//        PlatformManager platformManager = null;
-//        DispatcherNode dispatcherNode = null;
-//        WorldEdit worldEdit = null;
-//        DispatcherNode expResult = null;
-//        DispatcherNode result = LocalRegistrar.registerJaredCommands(platformManager, dispatcherNode, worldEdit);
-//        assertEquals(expResult, result);
-//        // TODO review the generated test code and remove the default call to fail.
-//        fail("The test case is a prototype.");
-//    }
-
-
 }

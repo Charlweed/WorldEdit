@@ -81,7 +81,6 @@ public class LocalRegistrar {
     private static final IsJarFilter JAR_FILTER = new IsJarFilter();
     private static final ClassNameFilter CLASSNAME_FILTER = new ClassNameFilter();
     private static final int MAX_DEPTH = 5;
-    private static final List<Class<?>> SEARCHED_CLASSES = new ArrayList<>();
     private static final List<File> SEARCHED_DIRS = new ArrayList<>();
     private static final List<File> SEARCHED_JARS = new ArrayList<>();
     private static final Map<String, Class<?>> KNOWN_CLASSES = new HashMap<>();
@@ -117,13 +116,19 @@ public class LocalRegistrar {
     }
 
     private static Object commandInstance(Class<?> clazz, WorldEdit worldEdit) {
+        LOGGER.log(Level.FINE, "instantiating {0}", clazz.getCanonicalName());
         Object result = null;
         if (hasWorldEditConstructor(clazz)) {
+            LOGGER.log(Level.FINER, "{0} has a WorldEdit constructor.", clazz.getCanonicalName());
             try {
                 Class<?>[] parameterType = new Class<?>[]{WorldEdit.class};
+                LOGGER.log(Level.FINER, "Created parameterType array wrapping WorldEdit class");
                 Object[] arguments = {worldEdit};
+                LOGGER.log(Level.FINER, "Created argument array wrapping WorldEdit instance");
                 Constructor<?> constructor = clazz.getConstructor(parameterType);
+                LOGGER.log(Level.FINE, "Obtained constructor. Calling...");
                 result = constructor.newInstance(arguments);
+                LOGGER.log(Level.FINE, "Instance of {0} obtained via WorldEdit constructor.", clazz.getCanonicalName());
             } catch (InstantiationException ex) {
                 LOGGER.log(Level.SEVERE, null, ex);
             } catch (IllegalAccessException ex) {
@@ -136,6 +141,8 @@ public class LocalRegistrar {
                 LOGGER.log(Level.SEVERE, null, ex);
             } catch (SecurityException ex) {
                 LOGGER.log(Level.SEVERE, null, ex);
+            } finally {
+                LOGGER.log(Level.FINER, "pass 0 instantiating {0}", clazz.getCanonicalName());
             }
         } else {
             try {
@@ -148,8 +155,11 @@ public class LocalRegistrar {
                 LOGGER.log(Level.SEVERE, null, ex);
             } catch (SecurityException ex) {
                 LOGGER.log(Level.SEVERE, null, ex);
+            } finally {
+                LOGGER.log(Level.FINE, "pass 1 instantiating {0}", clazz.getCanonicalName());
             }
         }
+        LOGGER.log(Level.FINE, "Instantiation attempt of {0} done.", clazz.getCanonicalName());
         return result;
     }
 
@@ -158,7 +168,7 @@ public class LocalRegistrar {
         List<Method> result = new ArrayList<>();
         Method[] classMethods;
         if (!ClassNameFilter.test(someClass.getCanonicalName())) {
-            LOGGER.log(Level.WARNING, "Skipping unacceptable class {0}", someClass.getName());
+            LOGGER.log(Level.INFO, "Skipping unacceptable class {0}", someClass.getName());
             return EMPTY_LIST;
         }
         try {
@@ -229,7 +239,9 @@ public class LocalRegistrar {
                 LOGGER.log(Level.WARNING, "Plugin directory \"{0}\" does not (yet) exist.", commandJarsDir.toString());
             }
         } catch (RuntimeException ex) {
-            LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
+            LOGGER.log(Level.SEVERE, "Runtime exception during jarred command registration.", ex);
+        } finally {
+            LOGGER.log(Level.INFO, "Jarred command registration done.");
         }
         return dispatcherNode;
     }
@@ -258,7 +270,7 @@ public class LocalRegistrar {
      * directory.
      */
     private void registerExtensionCommands() {
-        LOGGER.log(Level.WARNING, getExtenensionsDir().getAbsolutePath());
+        LOGGER.log(Level.INFO, getExtenensionsDir().getAbsolutePath());
         List<URL> cmdJarUrls = new ArrayList<>(4);
         List<Object> dispatchables = new ArrayList(4);
         registerExtensionCommandsInDir(cmdJarUrls, dispatchables, getExtenensionsDir());
@@ -269,7 +281,7 @@ public class LocalRegistrar {
             return;
         }
         SEARCHED_DIRS.add(extDir);
-        LOGGER.log(Level.WARNING, extDir.toString());
+        LOGGER.log(Level.INFO, extDir.toString());
 
         if (!DIR_FILTER.accept(extDir)) {
             throw new IllegalArgumentException("File " + extDir.toString() + " is not a directory.");
@@ -290,7 +302,7 @@ public class LocalRegistrar {
                 someJarURL = someJar.toURI().toURL();
                 if (!cmdJarUrls.contains(someJarURL)) {
                     cmdJarUrls.add(someJarURL);
-                    LOGGER.log(Level.WARNING, "Added {0} to commands dynamic classpath", someJarURL);
+                    LOGGER.log(Level.INFO, "Added {0} to commands dynamic classpath", someJarURL);
                 }
             } catch (MalformedURLException ex) {
                 LOGGER.log(Level.SEVERE, ex.getMessage(), ex);
@@ -590,8 +602,15 @@ public class LocalRegistrar {
      */
     private static class ClassNameFilter {
 
+        private static final List<String> DEATH_MARKS = Arrays.asList(
+                "nmsblocks",
+                "com.sk89q.minecraft",
+                "com.sk89q.worldedit"
+        );
+
         private static final List<String> UNACCEPTABLE = Arrays.asList(
                 "nmsblocks.CBXNmsBlock_1710",
+                "com.sk89q.minecraft.util.commands.CommandArgs",
                 "com.sk89q.worldedit.command.BiomeCommands",
                 "com.sk89q.worldedit.command.BrushCommands",
                 "com.sk89q.worldedit.command.ChunkCommands",
@@ -614,6 +633,11 @@ public class LocalRegistrar {
         );
 
         public static boolean test(String className) {
+            for (String deathMark : DEATH_MARKS) {
+                if (className.contains(deathMark)) {
+                    return false;
+                }
+            }
             return !UNACCEPTABLE.contains(className);
         }
     }

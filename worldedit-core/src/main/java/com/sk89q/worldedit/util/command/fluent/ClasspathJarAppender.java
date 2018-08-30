@@ -82,20 +82,36 @@ public class ClasspathJarAppender {
     }
 
     /**
-     * I fear this method does NOT do what I expect or want.
+     * <p>
+     * A Wrapper method for Class.forName, that ignores class names rejected by
+     * the filter predicate.</p>
+     * <p>
+     * <b>This method exposes bugs in the JVM.</b> Loading some classes, in
+     * particular classes already loaded from the <code>com.sk89q</code>
+     * packages, may crash the JVM instead of throwing
+     * <code>Exceptions</code>.</p>
      *
-     * @param filter A predicate that rejects class names belonging to known
-     * WorldEdit Commands.
-     * @param jarRegistrarLoader the current ClassLoader
-     * @param name the name of the class to find
+     * @param filter A <code>Predicate</code> that rejects class names belonging
+     * to known WorldEdit Commands, previously loaded classes, and other classes
+     * where their should be no load attempt. This test can prevent the JVM from
+     * crashing, so be as general as possible. For example, reject any class
+     * containing the substring <code>com.sk89q</code>
+     * @param jarRegistrarLoader the subordinate Jar ClassLoader
+     * @param name The name of the class to find
      * @return The loaded class.
      * @throws ClassNotFoundException
      */
     public static Class<?> findClass(Predicate<String> filter, URLClassLoader jarRegistrarLoader, String name) throws ClassNotFoundException {
-        LOG.log(Level.FINE, "finding and loading class {0}", name);
+        StringBuilder message = new StringBuilder("Finding and loading class ");
+        message.append(name);
+        LOG.log(Level.FINE, "{0}", new String[]{message.toString()});
         Class<?> result = null;
+        //This test must prevent the JVM from crashing!
         if (filter.test(name)) {
             try {
+//                System.err.println(message);//When the JVM crashes, all loggers fail.
+                System.err.flush();//If crash, we need logger output to be unmixed.
+                System.out.flush();//If crash, we need logger output to be unmixed.                
                 result = Class.forName(name, true, jarRegistrarLoader);
             } //May have different handling of these exceptions someday
             catch (SecurityException ex) {
@@ -109,10 +125,13 @@ public class ClasspathJarAppender {
                 throw new ClassNotFoundException(FAIL_PREFIX + name + FAIL_SUFFIX, ex);
             } finally {
                 System.out.flush();
+                System.err.flush();
             }
+        } else {
+            LOG.log(Level.INFO, "Ignored classname {0}", new String[]{name});
         }
         if (result != null) {
-            LOG.log(Level.INFO, "Successfully found and loaded class {0}", name);
+            LOG.log(Level.FINE, "Successfully found and loaded class {0}", name);
         }
         return result;
     }
